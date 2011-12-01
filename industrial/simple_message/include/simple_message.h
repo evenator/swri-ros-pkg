@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Software License Agreement (BSD License)
  *
  * Copyright (c) 2011, Southwest Research Institute
@@ -51,8 +51,12 @@ namespace StandardMsgTypes
 {
   enum StandardMsgType
   {
- UNUSED = 0,
- PING = 1
+ INVALID = 0,
+ PING = 1,
+ JOINT = 10,
+ CART = 11,
+ READ_INPUT = 21,
+ WRITE_OUTPUT = 20
   };
 }
 typedef StandardMsgTypes::StandardMsgType StandardMsgType;
@@ -64,7 +68,7 @@ namespace CommTypes
 {
   enum CommType
   {
- UNUSED = 0,
+ INVALID = 0,
  TOPIC = 1,
  SERVICE_REQUEST = 2,
  SERVICE_REPLY = 3
@@ -80,7 +84,7 @@ namespace ReplyTypes
 {
   enum ReplyType
   {
- UNUSED = 0,
+ INVALID = 0,
  SUCCESS = 1,
  FAILURE = 2
   };
@@ -139,6 +143,7 @@ public:
 
 	bool init(int msgType, int commType, int replyCode,
 	          industrial::byte_array::ByteArray &data );
+        bool init(int msgType, int commType, int replyCode);
         bool init(industrial::byte_array::ByteArray & msg);
 
         void toByteArray(industrial::byte_array::ByteArray & msg);

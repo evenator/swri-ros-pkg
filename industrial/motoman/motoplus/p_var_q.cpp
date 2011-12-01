@@ -30,178 +30,192 @@
 */ 
 
 #include "p_var_q.h"
+#include "joint_position.h"
+#include "joint_motion_handler.h"
+#include "ros_conversion.h"
+#include "log_wrapper.h"
 
-using utils::arrayIntToChar;
-using utils::arrayCharToInt;
+using motoman::joint_motion_handler;
+using motoman::ros_conversion;
+using industrial::joint_position;
 
-PVarQ::PVarQ(ROSSocket* sock, bool* motion_allowed)
-// Initializes position variable queue motion
+PVarQ::PVarQ()
 {	
-  // Set servo power variable
-  servo_power_on.sServoPower = ON;
 
-  // Set up start point variable
-  start_point.usType = MP_RESTYPE_VAR_ROBOT;
+  // Set up point variable
+  pointData_.usType = MP_RESTYPE_VAR_ROBOT;
   
-  // Set joint speed variable
-  joint_speed.usType = MP_RESTYPE_VAR_I;
-
-  // Initialize counter for starting points
-  start_counter = 0;
+  // Set integer variables
+  jointSpeedData_.usType = MP_RESTYPE_VAR_I;
+  
+  motionIndexInfo_.usType = MP_RESTYPE_VAR_I;
+  motionIndexInfo_.usIndex = MOTION_POINTER;
+  
+  bufferIndexInfo_.usType = MP_RESTYPE_VAR_I;
+  bufferIndexInfo_.usIndex = BUFFER_POINTER;
+  bufferIndexData_.usType = MP_RESTYPE_VAR_I;
+  bufferIndexData_.usIndex = BUFFER_POINTER;
+  
+  // TODO: Should check constants such as Q_SIZE, MOTION_POINTER & BUFFER_POINTER for
+  // consitency
 	
-  // Set up next point variable
-  next_point.usType = MP_RESTYPE_VAR_ROBOT;
-  next_point.ulValue[0] = 0;
-	
-  // Set up job variable
-  job_data.sTaskNo = 0;
-  strcpy(job_data.cJobName, JOBNAME);
-
-  // Declarations necessary for loop
-  next_iter = 0; // Current iteration and next loop iteration at which to copy data
-  task_data.sTaskNo = 0;
-	
-  // Set up socket
-  this->sock = sock;
-
-  // Set up motion allowed flag
-  this->motion_allowed = motion_allowed;
 }
 
 PVarQ::~PVarQ(void)
-// Puts robot on Hold status
 {
-  //servo_power_on.sServoPower = OFF;
-  //mpSetServoPower(&servo_power_on, &servo_power_error);
-  // Hold
-  hold_data.sHold = ON;
-  mpHold(&hold_data, &hold_error);
-
-  // Send ack message
-  //this->sock->sendMessage(CMD_ACK, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED, UNUSED);
 }
 
-LONG PVarQ::addPointPVQ(LONG* message)
-// Handles addition of new trajectory point. Adds to end of starting queue if it isn't full yet; else adds it to moving queue.
+
+void PVarQ::init(industrial::joint_position::JointPosition & point, double velocity_percent)
 {
-  LONG pulse_coords[8];
-  LONG velocity;
-	
-  // Extract position data from message
-  for (SHORT i = 0; i < 8; i++)
-    pulse_coords[i] = message[i+2];
-   
-  // Extract velocity from message
-  velocity = message[10];
-	
-  // If starting queue isn't full yet, add point to end of it
-  if (start_counter < (QSIZE-1))
-  {
-    // Position
-	start_point.usIndex = start_counter;
-	start_point.ulValue[0] = 0;
-	for (SHORT i = 0; i < 8; i++)
-	{
-	  start_point.ulValue[i+2] = pulse_coords[i];
-	}
-	if (mpPutPosVarData(&start_point, 1) == ERROR)
-	  return RC_MP_ERROR;
-	
-	// Velocity
-	joint_speed.usIndex = start_counter;
-	joint_speed.ulValue = velocity;
-	if (mpPutVarData(&joint_speed, 1) == ERROR)
-	  return RC_MP_ERROR;
-	
-	// Increment starting queue counter
-	start_counter++;
-  }
-  else if (start_counter >= (QSIZE-1))
-  {
-    // If starting queue has just been filled, start job
-	if (start_counter == (QSIZE-1))
-	{
-	  startJob();
-	  start_counter++;
-	}
-		
-	// Add new point to end of moving queue once first point in current queue has been executed
-	FOREVER
-	{
-	  if (*motion_allowed == false)
-	  {
-	    delete this;
-		return RC_MOTION_INTERRUPT;
-	  }
-	  mpGetCurJob(&task_data, &cur_job_data);
-	  cur_iter = cur_job_data.usJobLine - 2; // "-2" accounts for NOP and LABEL lines in job
-	  if (cur_iter == next_iter)
-	  {
-	    if (cur_iter == 0)
-		{
-		  next_point.usIndex = QSIZE-1;
-		  next_iter++;
-		}
-		else if (cur_iter >= 1 && cur_iter <= QSIZE-2)
-		{
-		  next_point.usIndex = cur_iter - 1;
-		  next_iter++;
-		}
-		else if (cur_iter == QSIZE-1)
-		{
-		  next_point.usIndex = cur_iter - 1;
-		  next_iter = 0;
-		}
-		for (SHORT i = 0; i < 8; i++)
-		{
-		  next_point.ulValue[i+2] = pulse_coords[i];
-		}
-		if (mpPutPosVarData(&next_point, 1) == ERROR) // Write next trajectory point position
-		  return RC_MP_ERROR;
-		joint_speed.usIndex = next_point.usIndex;
-	    joint_speed.ulValue = velocity;
-		if (mpPutVarData(&joint_speed, 1) == ERROR) // Write next trajectory point velocity
-		  return RC_MP_ERROR;
-		break;
-	  }
-	}
-  }
-	
-  // Now that point has been added, return result
-  return RC_SUCCESS;
+  // Seed the intial point - this is required because upon startup, the indexes are zero and
+  // therefore the intial point never gets set.
+  setPosition(0, point, velocity_percent);
 }
 
-void PVarQ::startJob(void)
-// Turns on servo power and starts job
+void PVarQ::addPoint(industrial::joint_position::JointPosition & joints)
 {
-  printf("Starting job");
-  printf("\n");
-  // Check if servo power is on. Keep trying to turn it on until it is.
-  FOREVER
-  {
-    FOREVER
-	{
-	  if (mpGetServoPower(&servo_power_info) == OK);
-        break;
-	}
-	if (servo_power_info.sServoPower == OFF)
-	  mpSetServoPower(&servo_power_on, &servo_power_error);
-	else
-	  break;
-  }
+
+  // Wait until buffer is not full
+  while(this->bufferFull()) {
+      LOG_DEBUG("Waiting for buffer to not be full, retrying...");
+      mpTaskDelay(this->BUFFER_POLL_TICK_DELAY);
+  };
+  
+  setNextPosition(joints, VELOCITY);
+  incBufferIndex();
 	
-  // Turn off Hold status if it's on
-  hold_data.sHold = OFF;
-  FOREVER
+}
+
+int PVarQ::bufferSize()
+{
+  int motionIdx = this->getMotionIndex();
+  int bufferIdx = this->getBufferIndex();
+  int rtn = 0;
+  
+  if (motionIdx > bufferIdx)
   {
-    if (mpHold(&hold_data, &hold_error) == OK)
-	  break;
+    LOG_ERROR("Motion index: %d is greater than Buffer index: %d, returning empty buffer size", motionIdx, bufferIdx);
+    rtn = 0;
   }
-	
-  // Keep trying to start job until able to do so
-  FOREVER
+  else
   {
-    if (mpStartJob(&job_data, &job_error) == OK)
-	  break;
+    rtn = bufferIdx - motionIdx;
   }
+  
+  LOG_DEBUG("Buffer size: %d, buffer idx: %d, motion idx: %d", rtn, bufferIdx, motionIdx);
+  return rtn;  
+}
+    
+    
+int PVarQ::getMotionIndex()
+{
+  LONG val = 0;
+  
+  while (mpGetVarData ( &(this->motionIndexInfo_), &val, 1 ) == ERROR) {
+    LOG_ERROR("Failed to retreive motion index, retrying...");
+    mpTaskDelay(this->VAR_POLL_TICK_DELAY);
+  };
+  return val;
+}
+    
+int PVarQ::getBufferIndex()
+{
+  LONG val = 0;
+  
+  while (mpGetVarData ( &(this->bufferIndexInfo_), &val, 1 ) == ERROR) {
+    LOG_ERROR("Failed to retreive buffer index, retrying...");
+    mpTaskDelay(this->VAR_POLL_TICK_DELAY);
+  };
+  return val;
+}
+
+  
+int PVarQ::getMotionPosIndex()
+{
+  return (this->getMotionIndex() % this->posVarQueueSize());
+}
+  
+int PVarQ::getBufferPosIndex()
+{
+  return (this->getBufferIndex() % this->posVarQueueSize());
+}
+
+int PVarQ::getNextBufferPosIndex()
+{
+  return ((this->getBufferIndex() + 1) % this->posVarQueueSize());
+}
+    
+bool PVarQ::bufferFull()
+{
+  bool rtn = false;
+  int bufferSize = this->bufferSize();
+  int maxBufferSize = this->maxBufferSize();
+  if (bufferSize >= maxBufferSize)
+  {
+    LOG_DEBUG("Buffer is full, size: %d, max size: %d",
+        bufferSize, maxBufferSize);
+    rtn = true;
+  }
+  return rtn;
+}
+
+bool PVarQ::bufferEmpty()
+{
+  bool rtn = false;
+  if (this->bufferSize() <= 0)
+  {
+    LOG_DEBUG("Buffer is empty");
+    rtn = true;
+  }
+  return rtn;
+}
+
+void PVarQ::incBufferIndex()
+{
+  int bufferIdx = this->getBufferIndex();
+  this->bufferIndexData_.ulValue = bufferIdx + 1;
+  
+  LOG_DEBUG("Incrementing buffer index from %d to %d", bufferIdx, this->bufferIndexData_.ulValue);
+  
+  while (mpPutVarData ( &(this->bufferIndexData_), 1 ) == ERROR) {
+    LOG_ERROR("Failed to increment buffer index, retrying...");
+    mpTaskDelay(this->VAR_POLL_TICK_DELAY);
+  };
+}
+
+
+void PVarQ::setNextPosition(industrial::joint_position::JointPosition & point, double velocity_percent)
+{
+  setPosition(this->getNextBufferPosIndex(), point, velocity_percent); 
+}
+
+
+void PVarQ::setPosition(int index, industrial::joint_position::JointPosition & point, 
+    double velocity_percent)
+{
+  const double VELOCITY_CONVERSION = 100.0;
+  int convertedVelocity = 0;
+  
+  LOG_DEBUG("Setting joint position, index: %d", index);
+  motoman::ros_conversion::toMpPosVarData(index, point, this->pointData_);
+  
+  while (mpPutPosVarData ( &(this->pointData_), 1 ) == ERROR) {
+    LOG_ERROR("Failed set position variable, index: %d, retrying...", index);
+    mpTaskDelay(this->VAR_POLL_TICK_DELAY);
+  };
+  
+  convertedVelocity = (int)(velocity_percent * VELOCITY_CONVERSION);
+  LOG_DEBUG("Converting percent velocity: %g to motoman integer value: %d", 
+    velocity_percent, convertedVelocity);
+  this->jointSpeedData_.ulValue = convertedVelocity;
+  this->jointSpeedData_.usIndex = index;
+  
+  LOG_DEBUG("Setting velocity, index: %d, value: %d", this->jointSpeedData_.usIndex, 
+    this->jointSpeedData_.ulValue);
+    
+  while (mpPutVarData ( &(this->jointSpeedData_), 1 ) == ERROR) {
+    LOG_ERROR("Failed to set position varaible, index: %d, retrying...", this->jointSpeedData_.usIndex);
+    mpTaskDelay(this->VAR_POLL_TICK_DELAY);
+  };
 }

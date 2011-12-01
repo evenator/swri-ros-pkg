@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Software License Agreement (BSD License)
  *
  * Copyright (c) 2011, Southwest Research Institute
@@ -29,6 +29,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef MOTOPLUS //motoPlus header must be first
+#include "motoPlus.h"
+#endif
+
 #include "simple_message.h"
 #include "log_wrapper.h"
 
@@ -49,9 +53,18 @@ SimpleMessage::~SimpleMessage(void)
 }
 
 
+
+bool SimpleMessage::init(int msgType, int commType, int replyCode)
+{
+  ByteArray data;
+  data.init();
+  return this->init(msgType, commType, replyCode, data);
+}
+
 bool SimpleMessage::init(int msgType, int commType, int replyCode, ByteArray & data )
 {
-  LOG_DEBUG("SimpleMessage::init(%u, %u, %u, data...)", msgType, commType, replyCode);
+  LOG_DEBUG("SimpleMessage::init(type: %d, comm: %d, reply: %d, data[%d]...)",
+            msgType, commType, replyCode, data.getBufferSize());
   this->setMessageType(msgType);
   this->setCommType(commType);
   this->setReplyCode(replyCode);
@@ -62,8 +75,8 @@ bool SimpleMessage::init(int msgType, int commType, int replyCode, ByteArray & d
 
 bool SimpleMessage::init(ByteArray & msg)
 {
-  int dataSize;
-  bool rtn;
+  int dataSize = 0;
+  bool rtn = false;
 
   if (msg.getBufferSize() >= this->getHeaderSize())
   {
@@ -72,11 +85,15 @@ bool SimpleMessage::init(ByteArray & msg)
     if (msg.getBufferSize() > this->getHeaderSize())
     {
       dataSize = msg.getBufferSize() - this->getHeaderSize();
+      LOG_DEBUG("Unloading data portion of message: %d bytes", dataSize);
+      msg.unload(this->data_, dataSize);
     }
-    msg.unload(this->data_.getRawDataPtr(), dataSize);
+    LOG_DEBUG("Unloading header data");
     msg.unload(this->reply_code_);
     msg.unload(this->comm_type_);
     msg.unload(this->message_type_);
+    LOG_DEBUG("SimpleMessage::init(type: %d, comm: %d, reply: %d, data[%d]...)",
+              this->message_type_, this->comm_type_, this->reply_code_, this->data_.getBufferSize());
     rtn = this->validateMessage();
   }
   else
@@ -94,7 +111,10 @@ void SimpleMessage::toByteArray(ByteArray & msg)
   msg.load(this->getMessageType());
   msg.load(this->getCommType());
   msg.load(this->getReplyCode());
-  msg.load(this->getData().getRawDataPtr(), this->data_.getBufferSize());
+  if (this->data_.getBufferSize() > 0 )
+  {
+    msg.load(this->getData().getRawDataPtr(), this->data_.getBufferSize());
+  }
 
 }
 
@@ -108,13 +128,13 @@ void SimpleMessage::setData( ByteArray & data)
 bool SimpleMessage::validateMessage()
 {
 
-  if ( StandardMsgTypes::UNUSED == this->getMessageType())
+  if ( StandardMsgTypes::INVALID == this->getMessageType())
   {
     LOG_WARN("Invalid message type: %u", this->getMessageType());
     return false;
   }
 
-  if ( CommTypes::UNUSED == this->getCommType())
+  if ( CommTypes::INVALID == this->getCommType())
   {
     LOG_WARN("Invalid comms. type: %u", this->getCommType());
     return false;
@@ -122,9 +142,9 @@ bool SimpleMessage::validateMessage()
 
   if (
       (CommTypes::SERVICE_REPLY ==  this->getCommType() &&
-          ReplyTypes::UNUSED == this->getReplyCode()) ||
+          ReplyTypes::INVALID == this->getReplyCode()) ||
           ((CommTypes::SERVICE_REPLY !=  this->getCommType() &&
-              ReplyTypes::UNUSED != this->getReplyCode()))
+              ReplyTypes::INVALID != this->getReplyCode()))
   )
   {
     LOG_WARN("Invalid reply. Comm type: %u, Reply type: %u",

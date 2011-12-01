@@ -1,4 +1,4 @@
-/*
+﻿/*
 * Software License Agreement (BSD License)
 *
 * Copyright (c) 2011, Southwest Research Institute
@@ -32,8 +32,13 @@
 #ifndef LOG_WRAPPER_H_
 #define LOG_WRAPPER_H_
 
+#ifdef ROS
+#include "ros/ros.h"
+#endif
 
-#include "stdio.h"  //printf
+#ifdef MOTOPLUS
+#include "motoPlus.h"
+#endif
 
 namespace industrial
 {
@@ -47,44 +52,10 @@ namespace industrial
  */
 namespace log_wrapper
 {
+    
 
-
-// By default we will log to printf.  Other types of logging (if defined) will
-// override these definitions below.
-#define SIMP_LOGGER
-#ifdef SIMP_LOGGER
-
-
-#define LOG_DEBUG(format, ...)  \
-  printf("DEBUG: "); \
-  printf(format, ##__VA_ARGS__); \
-  printf("\n")
-
-#define LOG_INFO(format, ...)  \
-    printf("INFO: "); \
-    printf(format, ##__VA_ARGS__); \
-    printf("\n")
-
-#define LOG_WARN(format, ...)  \
-    printf("WARN: "); \
-    printf(format, ##__VA_ARGS__); \
-    printf("\n")
-
-#define LOG_ERROR(format, ...)  \
-    printf("ERROR: "); \
-    printf(format, ##__VA_ARGS__); \
-    printf("\n")
-
-#define LOG_FATAL(format, ...)  \
-    printf("FATAL: "); \
-    printf(FATAL, ##__VA_ARGS__); \
-    printf("\n")
-
-#endif //SIMP_LOGGER
-
-
-// Define ROS_LOGGER if this library will execute under ROS
-#ifdef ROS_LOGGER
+// Define ROS if this library will execute under ROS
+#ifdef ROS
 
 #define LOG_DEBUG(format, ...)  \
   ROS_DEBUG(format, ##__VA_ARGS__)
@@ -99,41 +70,33 @@ namespace log_wrapper
   ROS_ERROR(format, ##__VA_ARGS__)
 
 #define LOG_FATAL(format, ...)  \
-  ROS_DEBUG(FATAL, ##__VA_ARGS__)
+  ROS_FATAL(FATAL, ##__VA_ARGS__)
 
-#endif //ROS_LOGGER
+#endif //ROS
 
 
 
-// Define MOTOPLUS_LOGGER if this library will execute under MOTOPLUS
-#ifdef MOTOPLUS_LOGGER
+// Define MOTOPLUS if this library will execute under MOTOPLUS
+#ifdef MOTOPLUS
 
-#define LOG_DEBUG(format, ...)  \
-  printf("DEBUG: "); \
+#define LOG(level, format, ...) \
+do \
+{ \
+  printf(level); \
+  printf(": "); \
   printf(format, ##__VA_ARGS__); \
-  printf("\n")
+  printf("\n"); \
+  } while (0)
 
-#define LOG_INFO(format, ...)  \
-    printf("INFO: "); \
-    printf(format, ##__VA_ARGS__); \
-    printf("\n")
+#define LOG_DEBUG(format, ...) LOG("DEBUG", format, ##__VA_ARGS__) 
+#define LOG_INFO(format, ...)  LOG("INFO", format, ##__VA_ARGS__)
+#define LOG_WARN(format, ...)  LOG("WARNING", format, ##__VA_ARGS__)
+#define LOG_ERROR(format, ...) LOG("ERROR", format, ##__VA_ARGS__)
+#define LOG_FATAL(format, ...) LOG("FATAL", format, ##__VA_ARGS__)
 
-#define LOG_WARN(format, ...)  \
-    printf("WARN: "); \
-    printf(format, ##__VA_ARGS__); \
-    printf("\n")
+#endif //MOTPLUS
 
-#define LOG_ERROR(format, ...)  \
-    printf("ERROR: "); \
-    printf(format, ##__VA_ARGS__); \
-    printf("\n")
 
-#define LOG_FATAL(format, ...)  \
-    printf("FATAL: "); \
-    printf(FATAL, ##__VA_ARGS__); \
-    printf("\n")
-
-#endif //MOTPLUS_LOGGER
 
 } // namespace industrial
 } // namespace loge_wrapper

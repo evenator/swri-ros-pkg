@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Software License Agreement (BSD License)
  *
  * Copyright (c) 2011, Southwest Research Institute
@@ -29,9 +29,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+
+#ifdef MOTOPLUS //motoPlus header must be first
+#include "motoPlus.h"
+#endif
+
+#include "log_wrapper.h"
 #include "smpl_msg_connection.h"
 #include "byte_array.h"
-#include "log_wrapper.h"
 
 using namespace industrial::simple_message;
 using namespace industrial::byte_array;
@@ -42,25 +47,19 @@ namespace industrial
 namespace smpl_msg_connection
 {
 
-SmplMsgConnection::SmplMsgConnection()
-{
-}
-
-
-SmplMsgConnection::~SmplMsgConnection()
-{
-}
-
 
 bool SmplMsgConnection::sendMsg(SimpleMessage & message)
 {
   bool rtn;
+  ByteArray sendBuffer;
   ByteArray msgData;
 
   if (message.validateMessage())
   {
     message.toByteArray(msgData);
-    rtn = this->send(msgData);
+    sendBuffer.load((int)msgData.getBufferSize());
+    sendBuffer.load(msgData);
+    rtn = this->sendBytes(sendBuffer);
   }
   else
   {
@@ -72,7 +71,7 @@ return rtn;
 }
 
 
-bool SmplMsgConnection::receiveAllMsgs(SimpleMessage & message)
+bool SmplMsgConnection::receiveMsg(SimpleMessage & message)
 {
   ByteArray lengthBuffer;
   ByteArray msgBuffer;
@@ -81,18 +80,20 @@ bool SmplMsgConnection::receiveAllMsgs(SimpleMessage & message)
   bool rtn = false;
 
 
-  rtn = this->receive(lengthBuffer, message.getLengthSize());
+  rtn = this->receiveBytes(lengthBuffer, message.getLengthSize());
 
   if (rtn)
   {
     rtn = lengthBuffer.unload(length);
+    LOG_DEBUG("Message length: %d", length);
 
     if (rtn)
     {
-      rtn = this->receive(msgBuffer, length);
+      rtn = this->receiveBytes(msgBuffer, length);
 
       if (rtn)
       {
+        LOG_DEBUG("receiveMsg: initializing SimpleMessage");
         rtn = message.init(msgBuffer);
       }
       else
@@ -117,41 +118,7 @@ bool SmplMsgConnection::receiveAllMsgs(SimpleMessage & message)
   return rtn;
 }
 
-bool SmplMsgConnection::receiveMsg(SimpleMessage & message)
-{
 
-  bool rtn = false;
-  SimpleMessage ping;
-
-  do {
-    rtn = this->receiveAllMsgs(message);
-
-    if (rtn)
-    {
-      // Respond to pings immediately (higher level messages
-      // are passed up to the calling function.
-      if(StandardMsgTypes::PING == message.getMessageType())
-      {
-        ping.init(StandardMsgTypes::PING, CommTypes::SERVICE_REPLY,
-                  ReplyTypes::SUCCESS, message.getData());
-
-        this->sendMsg(ping);
-      }
-      else
-      {
-        rtn = true;
-        break;
-      }
-    }
-    else
-    {
-      rtn = false;
-      break;
-    }
-  } while (true);
-
-  return rtn;
-}
 
 bool SmplMsgConnection::sendAndReceiveMsg(SimpleMessage & send, SimpleMessage & recv)
 {	

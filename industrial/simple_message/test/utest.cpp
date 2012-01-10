@@ -29,20 +29,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "simple_message.h"
-#include "byte_array.h"
-#include "shared_types.h"
-#include "smpl_msg_connection.h"
-#include "socket/udp_client.h"
-#include "socket/udp_server.h"
-#include "socket/tcp_client.h"
-#include "socket/tcp_server.h"
-#include "ping_message.h"
-#include "ping_handler.h"
-#include "joint_message.h"
-#include "joint_position.h"
-#include "message_manager.h"
-#include "simple_comms_fault_handler.h"
+#include "simple_message/simple_message.h"
+#include "simple_message/byte_array.h"
+#include "simple_message/shared_types.h"
+#include "simple_message/smpl_msg_connection.h"
+#include "simple_message/socket/udp_client.h"
+#include "simple_message/socket/udp_server.h"
+#include "simple_message/socket/tcp_client.h"
+#include "simple_message/socket/tcp_server.h"
+#include "simple_message/ping_message.h"
+#include "simple_message/ping_handler.h"
+#include "simple_message/messages/joint_message.h"
+#include "simple_message/joint_data.h"
+#include "simple_message/message_manager.h"
+#include "simple_message/simple_comms_fault_handler.h"
+#include "simple_message/joint_traj_pt.h"
+#include "simple_message/messages/joint_traj_pt_message.h"
+#include "simple_message/typed_message.h"
+#include "simple_message/joint_traj.h"
 
 #include <gtest/gtest.h>
 // Use pthread instead of boost::thread so we can cancel the TCP/UDP server
@@ -62,18 +66,22 @@ using namespace industrial::tcp_client;
 using namespace industrial::tcp_server;
 using namespace industrial::ping_message;
 using namespace industrial::ping_handler;
-using namespace industrial::joint_position;
+using namespace industrial::joint_data;
 using namespace industrial::joint_message;
 using namespace industrial::message_manager;
 using namespace industrial::simple_comms_fault_handler;
+using namespace industrial::joint_traj_pt;
+using namespace industrial::joint_traj_pt_message;
+using namespace industrial::typed_message;
+using namespace industrial::joint_traj;
 
 TEST(ByteArraySuite, init)
 {
 
   const shared_int SIZE = 100;
-  const shared_int TOO_BIG = 5000;
 
   ByteArray bytes;
+  shared_int TOO_BIG = bytes.getMaxBufferSize()+1;
 
   char bigBuffer[TOO_BIG];
   char buffer[SIZE];
@@ -152,6 +160,11 @@ TEST(ByteArraySuite, copy)
   // Copy
   ByteArray copyFrom;
   ByteArray copyTo;
+  ByteArray tooBig;
+
+
+  shared_int TOO_BIG = tooBig.getMaxBufferSize()-1;
+  char bigBuffer[TOO_BIG];
 
   EXPECT_TRUE(copyFrom.init(&buffer[0], SIZE));
   EXPECT_TRUE(copyTo.load(copyFrom));
@@ -159,8 +172,10 @@ TEST(ByteArraySuite, copy)
   EXPECT_TRUE(copyTo.load(copyFrom));
   EXPECT_EQ((shared_int)copyTo.getBufferSize(), 2*SIZE);
 
-  //Copy too large
-  EXPECT_FALSE(copyTo.load(copyFrom));
+  // Copy too large
+  EXPECT_TRUE(tooBig.init(&bigBuffer[0], TOO_BIG));
+  EXPECT_FALSE(copyTo.load(tooBig));
+  // A failed load should not change the buffer.
   EXPECT_EQ((shared_int)copyTo.getBufferSize(), 2*SIZE);
 }
 
@@ -205,7 +220,7 @@ TEST(PingMessageSuite, toMessage)
 
   ping.init();
 
-  ASSERT_TRUE(ping.toReply(msg));
+  ASSERT_TRUE(ping.toReply(msg, ReplyTypes::SUCCESS));
   EXPECT_EQ(StandardMsgTypes::PING, msg.getMessageType());
   EXPECT_EQ(CommTypes::SERVICE_REPLY, msg.getCommType());
   EXPECT_EQ(ReplyTypes::SUCCESS, msg.getReplyCode());
@@ -267,7 +282,7 @@ spinFunc(void* arg)
   return NULL;
 }
 
-TEST(MessageManagerSuite, udp)
+TEST(DISABLED_MessageManagerSuite, udp)
 {
   const int udpPort = 11000;
   char ipAddr[] = "127.0.0.1";
@@ -357,7 +372,7 @@ TEST(MessageManagerSuite, tcp)
 
 TEST(JointMessage, init)
 {
-  JointPosition joint;
+  JointData joint;
 
   joint.init();
   EXPECT_TRUE(joint.setJoint(0, 1.0));
@@ -377,7 +392,7 @@ TEST(JointMessage, init)
 
 TEST(JointMessage, equal)
 {
-  JointPosition jointlhs, jointrhs;
+  JointData jointlhs, jointrhs;
 
   jointrhs.init();
   jointlhs.init();
@@ -395,7 +410,7 @@ TEST(JointMessage, equal)
 
 TEST(JointMessage, toMessage)
 {
-  JointPosition toMessage, fromMessage;
+  JointData toMessage, fromMessage;
   JointMessage msg;
 
   toMessage.init();
@@ -409,16 +424,39 @@ TEST(JointMessage, toMessage)
 
 }
 
-TEST(JointMessageComms, tcp)
+// Message passing routine, used to send and receive a typed message
+// Useful for checking the packing and unpacking of message data.
+void messagePassing(TypedMessage &send, TypedMessage &recv)
 {
-  const int tcpPort = 11010;
-  char ipAddr[] = "127.0.0.1";
+	const int tcpPort = 11010;
+	  char ipAddr[] = "127.0.0.1";
 
-  TcpClient tcpClient;
-  TcpServer tcpServer;
-  SimpleMessage msgSend, msgRecv;
+	  TcpClient tcpClient;
+	  TcpServer tcpServer;
+	  SimpleMessage msgSend, msgRecv;
+
+	  ASSERT_TRUE(send.toTopic(msgSend));
+
+	  // Construct server
+
+	  ASSERT_TRUE(tcpServer.init(tcpPort));
+
+	  // Construct a client
+	  ASSERT_TRUE(tcpClient.init(&ipAddr[0], tcpPort));
+	  ASSERT_TRUE(tcpClient.makeConnect());
+
+	  ASSERT_TRUE(tcpServer.makeConnect());
+
+	  ASSERT_TRUE(tcpClient.sendMsg(msgSend));
+	  ASSERT_TRUE(tcpServer.receiveMsg(msgRecv));
+	  ASSERT_TRUE(recv.init(msgRecv));
+}
+
+TEST(JointMessage, Comms)
+{
+
   JointMessage jointSend, jointRecv;
-  JointPosition posSend, posRecv;
+  JointData posSend, posRecv;
 
   posSend.init();
   posSend.setJoint(0,1.0);
@@ -433,25 +471,119 @@ TEST(JointMessageComms, tcp)
   posSend.setJoint(9,10.0);
 
   jointSend.init(1, posSend);
-  ASSERT_TRUE(jointSend.toTopic(msgSend));
 
-  // Construct server
+  messagePassing(jointSend, jointRecv);
 
-  ASSERT_TRUE(tcpServer.init(tcpPort));
-
-  // Construct a client
-  ASSERT_TRUE(tcpClient.init(&ipAddr[0], tcpPort));
-  ASSERT_TRUE(tcpClient.makeConnect());
-
-  // Listen for client connection, init manager and start thread
-  ASSERT_TRUE(tcpServer.makeConnect());
-
-  ASSERT_TRUE(tcpClient.sendMsg(msgSend));
-  ASSERT_TRUE(tcpServer.receiveMsg(msgRecv));
-  ASSERT_TRUE(jointRecv.init(msgRecv));
   posRecv.copyFrom(jointRecv.getJoints());
   ASSERT_TRUE(posRecv==posSend);
 }
+
+
+TEST(JointTrajPt, equal)
+{
+	JointTrajPt lhs, rhs;
+	JointData joint;
+
+  joint.init();
+  ASSERT_TRUE(joint.setJoint(0, 1.0));
+  ASSERT_TRUE(joint.setJoint(1, 2.0));
+  ASSERT_TRUE(joint.setJoint(2, 3.0));
+  ASSERT_TRUE(joint.setJoint(3, 4.0));
+  ASSERT_TRUE(joint.setJoint(4, 5.0));
+  ASSERT_TRUE(joint.setJoint(5, 6.0));
+  ASSERT_TRUE(joint.setJoint(6, 7.0));
+  ASSERT_TRUE(joint.setJoint(7, 8.0));
+  ASSERT_TRUE(joint.setJoint(8, 9.0));
+  ASSERT_TRUE(joint.setJoint(9, 10.0));
+
+  rhs.init(1.0, joint, 50.0);
+  EXPECT_FALSE(lhs==rhs);
+
+  lhs.init(0, joint, 0);
+  EXPECT_FALSE(lhs==rhs);
+
+  lhs.copyFrom(rhs);
+  EXPECT_TRUE(lhs==rhs);
+
+}
+
+TEST(JointTrajPt, toMessage)
+{
+	JointTrajPt toMessage, fromMessage;
+	JointTrajPtMessage msg;
+
+  toMessage.init();
+  toMessage.setSequence(99);
+  msg.init(toMessage);
+
+  fromMessage.copyFrom(msg.point_);
+
+  EXPECT_TRUE(toMessage==fromMessage);
+
+}
+
+
+TEST(JointTrajPt, Comms)
+{
+
+	JointTrajPtMessage jointSend, jointRecv;
+	JointData data;
+	JointTrajPt posSend, posRecv;
+
+	data.init();
+	data.setJoint(0,1.0);
+	data.setJoint(1,2.0);
+	data.setJoint(2,3.0);
+	data.setJoint(3,4.0);
+	data.setJoint(4,5.0);
+	data.setJoint(5,6.0);
+	data.setJoint(6,7.0);
+	data.setJoint(7,8.0);
+	data.setJoint(8,9.0);
+	data.setJoint(9,10.0);
+	posSend.init(1, data, 99);
+
+  jointSend.init(posSend);
+
+  messagePassing(jointSend, jointRecv);
+
+  posRecv.copyFrom(jointRecv.point_);
+  ASSERT_TRUE(posRecv==posSend);
+}
+
+TEST(JointTraj, equal)
+{
+	JointTraj lhs, rhs;
+	JointData joint;
+	JointTrajPt point;
+
+  joint.init();
+  ASSERT_TRUE(joint.setJoint(0, 1.0));
+  ASSERT_TRUE(joint.setJoint(1, 2.0));
+  ASSERT_TRUE(joint.setJoint(2, 3.0));
+  ASSERT_TRUE(joint.setJoint(3, 4.0));
+  ASSERT_TRUE(joint.setJoint(4, 5.0));
+  ASSERT_TRUE(joint.setJoint(5, 6.0));
+  ASSERT_TRUE(joint.setJoint(6, 7.0));
+  ASSERT_TRUE(joint.setJoint(7, 8.0));
+  ASSERT_TRUE(joint.setJoint(8, 9.0));
+  ASSERT_TRUE(joint.setJoint(9, 10.0));
+
+  point.init(1.0, joint, 50.0);
+  rhs.addPoint(point);
+  EXPECT_FALSE(lhs==rhs);
+
+  lhs.addPoint(point);
+  EXPECT_TRUE(lhs==rhs);
+
+  lhs.addPoint(point);
+  EXPECT_FALSE(lhs==rhs);
+
+  lhs.copyFrom(rhs);
+  EXPECT_TRUE(lhs==rhs);
+
+}
+
 
 // Run all the tests that were declared with TEST()
 int main(int argc, char **argv)

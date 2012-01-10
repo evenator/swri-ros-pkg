@@ -28,21 +28,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#ifdef MOTOPLUS //motoPlus header must be first
-#include "motoPlus.h"
+#ifdef ROS
+#include "simple_message/byte_array.h"
+#include "simple_message/simple_serialize.h"
+#include "simple_message/log_wrapper.h"
 #endif
 
+#ifdef MOTOPLUS
+#include "motoPlus.h"
 #include "byte_array.h"
 #include "simple_serialize.h"
 #include "log_wrapper.h"
+#endif
 
 #include "string.h"
 
-//namespace industrial
-//{
-//namespace byte_array
-//{
+namespace industrial
+{
+namespace byte_array
+{
 
 using namespace industrial::simple_serialize;
 using namespace industrial::shared_types;
@@ -392,5 +396,5 @@ char* ByteArray::getUnloadPtr(shared_int byteSize)
   return rtn;
 }
 
-//} // namespace byte_array
-//} // namespace industrial
+} // namespace byte_array
+} // namespace industrial

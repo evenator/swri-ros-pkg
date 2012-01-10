@@ -28,10 +28,18 @@
 * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 * POSSIBILITY OF SUCH DAMAGE.
 */ 
+#ifdef ROS
+#include "simple_message/ping_handler.h"
+#include "simple_message/ping_message.h"
+#include "simple_message/log_wrapper.h"
+#endif
 
+#ifdef MOTOPLUS
 #include "ping_handler.h"
 #include "ping_message.h"
 #include "log_wrapper.h"
+#endif
+
 
 
 using namespace industrial::ping_message;
@@ -56,7 +64,7 @@ bool PingHandler::internalCB(industrial::simple_message::SimpleMessage & in)
 
   if (ping.init(in))
   {
-    if (ping.toReply(msg))
+    if (ping.toReply(msg, ReplyTypes::SUCCESS))
     {
       if(this->getConnection()->sendMsg(msg))
       {

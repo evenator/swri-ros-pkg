@@ -28,10 +28,18 @@
 * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 * POSSIBILITY OF SUCH DAMAGE.
 */ 
+#ifdef ROS
+#include "simple_message/ping_message.h"
+#include "simple_message/log_wrapper.h"
+#include "simple_message/byte_array.h"
+#endif
 
+#ifdef MOTOPLUS
 #include "ping_message.h"
 #include "log_wrapper.h"
 #include "byte_array.h"
+#endif
+
 
 using namespace industrial::simple_message;
 using namespace industrial::byte_array;
@@ -75,23 +83,6 @@ bool PingMessage::init(SimpleMessage & msg)
 void PingMessage::init()
 {
   this->setMessageType(StandardMsgTypes::PING);
-}
-
-bool PingMessage::toRequest(industrial::simple_message::SimpleMessage & msg)
-{
-  return msg.init(this->getMessageType(),CommTypes::SERVICE_REQUEST,ReplyTypes::INVALID);
-}
-
-bool PingMessage::toReply(industrial::simple_message::SimpleMessage & msg)
-{
-  return msg.init(this->getMessageType(),CommTypes::SERVICE_REPLY,ReplyTypes::SUCCESS);
-}
-
-
-bool PingMessage::toTopic(industrial::simple_message::SimpleMessage & msg)
-{
-  // A ping is exclusively a service, it cannot be made into a topic.
-  return false;
 }
 
 

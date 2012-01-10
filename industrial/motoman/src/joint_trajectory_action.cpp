@@ -37,7 +37,7 @@
 #include <control_msgs/FollowJointTrajectoryAction.h>
 #include <control_msgs/FollowJointTrajectoryFeedback.h>
 
-const double DEFAULT_GOAL_THRESHOLD = 0.1;
+const double DEFAULT_GOAL_THRESHOLD = 0.01;
 
 class JointTrajectoryExecuter
 {
@@ -222,13 +222,13 @@ private:
 
   void controllerStateCB(const control_msgs::FollowJointTrajectoryFeedbackConstPtr &msg)
   {
-    ROS_DEBUG("Checking controller state feedback");
+    //ROS_DEBUG("Checking controller state feedback");
     last_controller_state_ = msg;
     ros::Time now = ros::Time::now();
 
     if (!has_active_goal_)
     {
-      ROS_DEBUG("No active goal, ignoring feedback");
+      //ROS_DEBUG("No active goal, ignoring feedback");
       return;
     }
     if (current_traj_.points.empty())

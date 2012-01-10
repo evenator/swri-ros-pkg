@@ -47,8 +47,12 @@ rosbuild_add_library(simple_message
 					src/message_manager.cpp
 					src/ping_handler.cpp
 					src/ping_message.cpp
-					src/joint_position.cpp
-					src/joint_message.cpp
+					src/joint_data.cpp
+					src/joint_traj_pt.cpp
+					src/joint_traj.cpp
+
+					src/messages/joint_message.cpp
+					src/messages/joint_traj_pt_message.cpp
 					
 					src/simple_comms_fault_handler.cpp
 					)

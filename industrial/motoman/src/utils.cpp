@@ -29,10 +29,11 @@
 * POSSIBILITY OF SUCH DAMAGE.
 */ 
 
-#include "utils.h"
-#include "definitions.h"
+#include <motoman/utils.h>
+#include <motoman/definitions.h>
 #include "ros/ros.h"
 #include "urdf/model.h"
+#include "math.h"
 
 using namespace trajectory_msgs;
 using namespace std;
@@ -42,10 +43,10 @@ namespace motoman
 namespace utils
 {
 
-  bool checkTrajectory(JointTrajectoryConstPtr trajectory)
+bool checkTrajectory(const trajectory_msgs::JointTrajectoryConstPtr& trajectory)
   {
     bool rtn = false;
-    rtn = checkJointNames(trajectory->joint_names);
+    rtn = checkJointNames(trajectory);
     if (!rtn)
     {
       ROS_WARN("Joint trajectory name check failed");
@@ -54,26 +55,26 @@ namespace utils
   }
 
 
-  bool checkJointNames(JointTrajectoryConstPtr trajectory)
+  bool checkJointNames(const JointTrajectoryConstPtr& trajectory)
   {
     bool rtn = false;
 
     // The maximum number of joints in the motoman controller is fixed
-    if (trajectory->joint_names.size() <= motoman::parameters::Parameters::JOINT_SUFFIXES_SIZE)
+    if ((int)trajectory->joint_names.size() <= motoman::parameters::Parameters::JOINT_SUFFIXES_SIZE)
     {
       rtn = true;
     }
     else
     {
       rtn = false;
-      ROS_WARN("Size of joint names: %d, exceeds motoman size: %d",
+      ROS_WARN("Size of joint names: %zd, exceeds motoman size: %d",
                trajectory->joint_names.size(),
                motoman::parameters::Parameters::JOINT_SUFFIXES_SIZE);
     }
 
     if (rtn)
     {
-      for(int i = 0; i<trajectory->joint_names.size(); i++)
+      for(unsigned int i = 0; i<trajectory->joint_names.size(); i++)
       {
         string suffix(motoman::parameters::Parameters::JOINT_SUFFIXES[i]);
         if ( hasSuffix(trajectory->joint_names[i], suffix ) )
@@ -93,7 +94,7 @@ namespace utils
   }
 
 
-  bool hasSuffix(string &str, string &suffix)
+  bool hasSuffix(const string &str, const string &suffix)
   {
     bool rtn = false;
     int result;
@@ -138,13 +139,17 @@ namespace utils
       if (urdf_model.initString(urdf))
       {
 
-        for(int i = 0; i<joint_names.size(); i++)
+        for(unsigned int i = 0; i<trajectory->joint_names.size(); i++)
         {
           double limit;
           boost::shared_ptr<const urdf::Joint> joint = urdf_model.getJoint(trajectory->joint_names[i]);
           limit = joint->limits->velocity;
-          ROS_DEBUG("Found joint velocity limit: %e for joint: %s", limit, trajectory->joint_names[i].c_str());
+          joint_velocity_limits[i] = limit;
+          ROS_DEBUG("Found joint velocity limit: %e for joint: %s", 
+                    joint_velocity_limits[i], trajectory->joint_names[i].c_str());
         }
+        ROS_DEBUG("Successefully populated velocity limits, size: %d", joint_velocity_limits.size());
+        rtn = true;
       }
       else
       {
@@ -174,21 +179,24 @@ namespace utils
   {
     double maxVelPct = 0.0;
 
+    ROS_DEBUG("Converting to motoman velocity, limit size: %d, velocity size: %d",
+              joint_velocity_limits.size(), joint_velocities.size());
     if (joint_velocity_limits.size() == joint_velocities.size())
     {
       for(int i = 0; i<joint_velocity_limits.size(); i++)
       {
-        if (joint_velocity_limits[i] > 0.0 && joint_velocities[i] > 0.0)
+        if (joint_velocity_limits[i] > 0.0)
         {
+          ROS_DEBUG("Calculating velocity percent");
           double velPct = joint_velocities[i]/joint_velocity_limits[i];
 
-          ROS_DEBUG("Calculating velocity percent, velocity: %e, limit: %e, percetn: %e",
+          ROS_DEBUG("Calculating velocity percent, velocity: %e, limit: %e, percent: %e",
                     joint_velocities[i], joint_velocity_limits[i], velPct);
-          if (velPct > maxVelPct)
+          if (abs(velPct) > maxVelPct)
           {
             ROS_DEBUG("Calculated velocity: %e, greater than current max: %e",
                       velPct, maxVelPct);
-            maxVelPct = velPct;
+            maxVelPct = abs(velPct);
           }
         }
         else

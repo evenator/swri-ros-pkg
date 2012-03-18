@@ -90,7 +90,7 @@ bool SmplMsgConnection::receiveMsg(SimpleMessage & message)
   if (rtn)
   {
     rtn = lengthBuffer.unload(length);
-    LOG_DEBUG("Message length: %d", length);
+    LOG_COMM("Message length: %d", length);
 
     if (rtn)
     {
@@ -98,7 +98,6 @@ bool SmplMsgConnection::receiveMsg(SimpleMessage & message)
 
       if (rtn)
       {
-        LOG_DEBUG("receiveMsg: initializing SimpleMessage");
         rtn = message.init(msgBuffer);
       }
       else
@@ -125,13 +124,19 @@ bool SmplMsgConnection::receiveMsg(SimpleMessage & message)
 
 
 
-bool SmplMsgConnection::sendAndReceiveMsg(SimpleMessage & send, SimpleMessage & recv)
+bool SmplMsgConnection::sendAndReceiveMsg(SimpleMessage & send, SimpleMessage & recv, bool verbose)
 {	
   bool rtn = false;
   rtn = this->sendMsg(send);
   if (rtn)
   {
+    if(verbose) {
+      LOG_ERROR("Sent message");
+    }
     rtn = this->receiveMsg(recv);
+    if(verbose) {
+      LOG_ERROR("Got message");
+    }
   }
   else
   {

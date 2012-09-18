@@ -19,6 +19,7 @@ namespace RosParams
 		static const std::string InputDataExtension = "InputDataExtension";
 		static const std::string InputCloudTopicName = "InputCloudTopic";
 		static const std::string RecognitionServiceName = "Recognition/ServiceName";
+		static const std::string SegmentationServiceName = "Segmentation/ServiceName";
 		static const std::string RecognitionHistogramSize = "Recognition/HistogramSize";
 		static const std::string RecognitionSimilarityThreshold = "Recognition/SimilarityThreshold";
 		static const std::string RecognitionNumNeighbors = "Recognition/NumberOfNeighbors";
@@ -46,6 +47,7 @@ namespace RosParams
 		static const std::string InputDataExtension = ".pcd";
 		static const std::string InputCloudTopicName = "/camera/depth_registered/points";
 		static const std::string RecognitionServiceName = "/object_recognition";
+		static const std::string SegmentationServiceName = "/tabletop_segmentation_serv";
 
 		static const int RecognitionHistogramSize = 300;
 		static const int RecognitionNumNeighbors = 1;
@@ -54,9 +56,9 @@ namespace RosParams
 
 		static const int SegmentationMaxIterations = 100;
 		static const double SegmentationDistanceThreshold = 0.02f;
-		static const double SegmentationLeafSizeX = 0.01f;
-		static const double SegmentationLeafSizeY = 0.01f;
-		static const double SegmentationLeafSizeZ = 0.01f;
+		static const double SegmentationLeafSizeX = 0.01;
+		static const double SegmentationLeafSizeY = 0.01;
+		static const double SegmentationLeafSizeZ = 0.01;
 		static const double SegmentationSpatialFilterMinX = -0.7f;
 		static const double SegmentationSpatialFilterMaxX = 0.7f;
 		static const double SegmentationSpatialFilterMinY = 10.0f;
@@ -73,12 +75,39 @@ namespace RosParams
 	{
 		Values()
 		{
+				InputDataDirectory = "";
+				InputDataExtension = "";
+				InputCloudTopicName = "";
+
+				RecognitionServiceName = "";
+				SegmentationServiceName = "";
+				RecognitionHistogramSize = 0;
+				RecognitionNumNeighbors = 0;
+				RecognitionSimilarityThreshold = 0;
+				RecognitionNormalEstimationRadius = 0;
+
+				SegmentationMaxIterations = 0;
+				SegmentationDistanceThreshold = 0;
+				SegmentationLeafSizeX = 0;
+				SegmentationLeafSizeY = 0;
+				SegmentationLeafSizeZ = 0;
+				SegmentationSpatialFilterMinX = 0;
+				SegmentationSpatialFilterMaxX = 0;
+				SegmentationSpatialFilterMinY = 0;
+				SegmentationSpatialFilterMaxY = 0;
+				SegmentationSpatialFilterMinZ = 0;
+				SegmentationSpatialFilterMaxZ = 0;
+				SegmentationClusterConfigAcctPercnt = 0;
+				SegmentationClusterConfigSpatialTolerance = 0; // meters
+				SegmentationClusterConfigMinSize = 0;
+				SegmentationClusterConfigMaxSize = 0;
 		}
 
 		std::string InputDataDirectory;
 		std::string InputDataExtension;
 		std::string InputCloudTopicName;
 
+		std::string SegmentationServiceName;
 		std::string RecognitionServiceName;
 		int RecognitionHistogramSize;
 		int RecognitionNumNeighbors;
@@ -120,6 +149,9 @@ public:
 	void loadParams(ros::NodeHandle &nh,bool useRelativeNamespace = true);
 
 	void loadParams(bool useRelativeNamespace = false);
+
+protected:
+
 };
 
 int alignTemplate (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::string modelName,
@@ -128,5 +160,7 @@ int alignTemplate (pcl::PointCloud<pcl::PointXYZ>::Ptr cloud, std::string modelN
 int SegmentCloud(sensor_msgs::PointCloud2 rawCloud, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> & cloudSegments);
 
 int SegmentCloud(sensor_msgs::PointCloud2 rawCloud, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> & cloudSegments,RosParametersList &params);
+
+int SegmentCloud(sensor_msgs::PointCloud2 rawCloud, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> & cloudSegments, pcl::PointCloud<pcl::PointXYZ>::Ptr table, RosParametersList &params);
 
 #endif

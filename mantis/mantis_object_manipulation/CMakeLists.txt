@@ -9,6 +9,8 @@ include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
 #  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
 #set(ROS_BUILD_TYPE RelWithDebInfo)
 
+# c++0x compatibility
+#ADD_DEFINITIONS("-std=c++0x")
 rosbuild_init()
 
 #set the default path for built executables to the "bin" directory
@@ -46,7 +48,16 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #rosbuild_add_library(RobotNavigator src/arm_navigators/RobotPickPlaceNavigator.cpp 
 #${FREETAIL_SRC}/utils/CustomPlaceTester.cpp ${FREETAIL_SRC}/segmentation/SphereSegmentation.cpp)
 
-rosbuild_add_library(RobotNavigator src/arm_navigators/RobotPickPlaceNavigator.cpp)
+rosbuild_add_library(RobotNavigator 
+	src/arm_navigators/RobotPickPlaceNavigator.cpp 
+	src/arm_navigators/SpherePickingRobotNavigator.cpp
+	src/zone_selection/PickPlaceZoneSelector.cpp)
 
-rosbuild_add_executable(mantis_pick_place_node src/demos/pick_place_demo_node.cpp)
+rosbuild_add_executable(mantis_pick_place_node src/nodes/pick_place_demo_node.cpp)
 target_link_libraries(mantis_pick_place_node RobotNavigator)
+
+rosbuild_add_executable(mantis_sphere_picking_node src/nodes/sphere_picking_demo_node.cpp)
+target_link_libraries(mantis_sphere_picking_node RobotNavigator)
+
+rosbuild_add_executable(test_zone_selector_node src/test/test_zone_selector_node.cpp)
+target_link_libraries(test_zone_selector_node RobotNavigator)

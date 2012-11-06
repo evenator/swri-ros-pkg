@@ -166,6 +166,19 @@ void MessageManager::spinOnce()
   }
 }
 
+int ms_per_clock;
+void mySleep(int sec)
+{
+#ifdef MOTOPLUS
+  if (ms_per_clock <= 0)
+    ms_per_clock = mpGetRtc();
+
+  mpTaskDelay(sec * 1000 / ms_per_clock);
+#else
+  sleep(sec);
+#endif
+}
+
 void MessageManager::spin()
 {
   LOG_INFO("Entering message manager spin loop");
@@ -176,6 +189,10 @@ void MessageManager::spin()
 #endif
   {
     this->spinOnce();
+
+    // Throttle loop speed if waiting for a re-connection
+    if (!this->getConnection()->isConnected())
+      mySleep(5);
   }
 }
 

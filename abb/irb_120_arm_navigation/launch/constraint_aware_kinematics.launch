@@ -1,0 +1,9 @@
+<launch>
+    <include file="$(find irb_120_arm_navigation)/launch/irb_120_planning_environment.launch" />
+    <node pkg="arm_kinematics_constraint_aware" type="arm_kinematics_constraint_aware" name="irb_120_irb_120_kinematics">
+        <param name="group" type="string" value="irb_120" />
+        <param name="irb_120/root_name" type="string" value="base_link" />
+        <param name="irb_120/tip_name" type="string" value="link_6" />
+        <param name="kinematics_solver" type="string" value="arm_kinematics_constraint_aware/KDLArmKinematicsPlugin" />
+    </node>
+</launch>

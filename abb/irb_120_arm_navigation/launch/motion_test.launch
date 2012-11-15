@@ -1,0 +1,4 @@
+<launch>
+    <node name='joint_publisher' pkg='irc5' type='sim_joint_stream.py' />
+    <node name='joint_downloader' pkg='irc5' type='motion_download_interface' args="192.168.0.50"/>
+</launch>

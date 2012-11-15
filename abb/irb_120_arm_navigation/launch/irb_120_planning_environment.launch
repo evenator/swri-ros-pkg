@@ -1,0 +1,4 @@
+<launch>
+    <param name="robot_description" textfile="$(find abb_common)/urdf/irb_120.urdf" />
+    <rosparam command="load" ns="robot_description_planning" file="$(find irb_120_arm_navigation)/config/irb_120_planning_description.yaml" />
+</launch>

@@ -14,6 +14,9 @@
 #include <cmath>
 #include <algorithm>
 #include <boost/ptr_container/ptr_vector.hpp>
+#include <tf_conversions/tf_eigen.h>
+#include <pcl/common/transforms.h>
+#include <tf/transform_listener.h>
 
 typedef pcl::PointCloud<pcl::PointXYZ> PclCloud;
 
@@ -21,14 +24,45 @@ PickPlaceZoneSelector::PickPlaceZoneSelector()
 :pick_zone_index_(0),
  pick_zones_(),
  place_zones_(),
- available_place_zones_()
+ active_place_zones_(),
+ inactive_place_zones_()
 {
 	// TODO Auto-generated constructor stub
+	initializeColorArray();
 
 }
 
 PickPlaceZoneSelector::~PickPlaceZoneSelector() {
 	// TODO Auto-generated destructor stub
+}
+
+void PickPlaceZoneSelector::initializeColorArray()
+{
+	const int numColors = 40;
+	const double ratio = 255.0f/((double)numColors);
+	std_msgs::ColorRGBA color;
+
+	// manually enter colors
+
+	color.r = 0.0f;color.g = 1.0f;color.b = 1.0f; color.a = 0.4f; marker_colors_.push_back(color); // aqua
+	color.r = 1.0f; color.g = 1.0f; color.b = 1.0f; color.a = 0.4f; marker_colors_.push_back(color); // white
+
+	// random colors
+	for(int i = 0; i < numColors ; i++)
+	{
+		color.r = (255.0f -  0.25f*((double)i)*ratio)/255.0f; // 255 to ~180
+		color.g = (0.75f*255.0f + (i % 2 == 0 ? (1) : (-1))*0.25f*((double)i)*ratio)/255.0f; // ~180 to 255
+		color.b = (0.80f*255.0f + (i % 2 == 0 ? (-1) : (1))*0.2f*(((double)i)*ratio))/255.0f; //[60%,100%]*255
+		color.a = 0.4f;
+
+		marker_colors_.push_back(color);
+
+	}
+
+	// yellow
+	color.r = 1.0f; color.g = 1.0f; color.b = 0.0f;
+	marker_colors_.push_back(color);
+
 }
 
 void PickPlaceZoneSelector::goToNextPickZone()
@@ -41,7 +75,8 @@ void PickPlaceZoneSelector::goToNextPickZone()
 	}
 
 	// resetting list of available place zones
-	available_place_zones_.clear();
+	active_place_zones_.clear();
+	inactive_place_zones_.clear();
 	ZoneBounds &pickZone = pick_zones_[pick_zone_index_];
 	for(unsigned int i = 0; i < place_zones_.size(); i++)
 	{
@@ -49,11 +84,13 @@ void PickPlaceZoneSelector::goToNextPickZone()
 		if(ZoneBounds::intersect(placeZone,pickZone) || ZoneBounds::contains(pickZone,placeZone))
 		{
 			// intersection or containment found, unavailable place zone
-			continue;
+			inactive_place_zones_.push_back(&place_zones_[i]);
 		}
-
-		placeZone.resetZone();
-		available_place_zones_.push_back(&placeZone);
+		else
+		{
+			placeZone.resetZone();
+			active_place_zones_.push_back(&place_zones_[i]);
+		}
 	}
 }
 
@@ -81,6 +118,20 @@ bool PickPlaceZoneSelector::isInPickZone(const sensor_msgs::PointCloud &cluster)
 	sensor_msgs::convertPointCloudToPointCloud2(cluster,clusterMsg);
 	pcl::fromROSMsg(clusterMsg,cloud);
 
+	// reference to active pick zone
+	ZoneBounds &pickZone = pick_zones_[pick_zone_index_];
+
+	// checking frame ids and transforming cloud if they are different
+	tf::TransformListener tfListener;
+	tf::StampedTransform clusterTransform;
+	Eigen::Affine3d tfEigen;
+	if(pickZone.FrameId.compare(cluster.header.frame_id) != 0)
+	{
+		tfListener.lookupTransform(pickZone.FrameId,cluster.header.frame_id,ros::Time::now(),clusterTransform);
+		tf::TransformTFToEigen(clusterTransform,tfEigen);
+		pcl::transformPointCloud(cloud,cloud,Eigen::Affine3f(tfEigen));
+	}
+
 	// finding centroid
 	Eigen::Vector4f centroid;
 	pcl::compute3DCentroid(cloud,centroid);
@@ -90,7 +141,6 @@ bool PickPlaceZoneSelector::isInPickZone(const sensor_msgs::PointCloud &cluster)
 	clusterCentroid.x = centroid[0];
 	clusterCentroid.y = centroid[1];
 
-	ZoneBounds &pickZone = pick_zones_[pick_zone_index_];
 
 	if(((pickZone.XMin > clusterCentroid.x) || (pickZone.XMax < clusterCentroid.x)) ||
 			((pickZone.YMin > clusterCentroid.y) || (pickZone.YMax < clusterCentroid.y)))
@@ -103,27 +153,27 @@ bool PickPlaceZoneSelector::isInPickZone(const sensor_msgs::PointCloud &cluster)
 
 bool  PickPlaceZoneSelector::generateNextLocationCandidates(std::vector<geometry_msgs::PoseStamped> &placePoses)
 {
-	std::vector<PlaceZone* > adjacentZones;
+	std::vector<PlaceZone* > nearbyZones;
 
 	// searches in all available place zones for a location
 	bool locationFound = false;
-	for(std::size_t i = 0; i < available_place_zones_.size(); i++)
+	for(std::size_t i = 0; i < active_place_zones_.size(); i++)
 	{
-		PlaceZone& placeZone = *available_place_zones_[i];
+		PlaceZone& placeZone = *active_place_zones_[i];
 		if(placeZone.isIdInZone(next_obj_details_.Id))
 		{
 			// creating array with available place zones not including the current one
-			adjacentZones.assign(available_place_zones_.begin(),available_place_zones_.end());
-			adjacentZones.erase(adjacentZones.begin() + i);
+			nearbyZones.assign(active_place_zones_.begin(),active_place_zones_.end());
+			nearbyZones.erase(nearbyZones.begin() + i);
+			nearbyZones.insert(nearbyZones.end(),inactive_place_zones_.begin(),inactive_place_zones_.end());
 
 			placeZone.setNextObjectDetails(next_obj_details_);
-			if(placeZone.generateNextLocationCandidates(placePoses,adjacentZones))
+			if(placeZone.generateNextLocationCandidates(placePoses,nearbyZones))
 			{
 				// location found, exit search
 				locationFound = true;
 				break;
 			}
-
 		}
 	}
 	return locationFound;
@@ -131,40 +181,67 @@ bool  PickPlaceZoneSelector::generateNextLocationCandidates(std::vector<geometry
 
 void PickPlaceZoneSelector::getPickZoneMarker(visualization_msgs::Marker &marker)
 {
-//	ZoneBounds &zone = Zones[pick_zone_index_];
-//	zone.getMarker(marker);
-//
-//	std_msgs::ColorRGBA color;
-//	color.r = 1.0f;
-//	color.g = 1.0f;
-//	color.b = 0.0f;
-//	color.a = 0.4f;
-//
-//	// computing transform
-//	tf::Vector3 center = zone.getCenter();
-//	tf::Quaternion q = tf::Quaternion(tf::Vector3(0.0f,0.0f,1.0f),0.0f);
-//	tf::Transform zoneTf = tf::Transform(q,center);
-//	tf::poseTFToMsg(zoneTf,marker.pose);
-//
-//	// filling additional fields
-//	marker.color = color;
-//	marker.header.frame_id = place_zone_.FrameId;
+	ZoneBounds &zone = pick_zones_[pick_zone_index_];
+	zone.getMarker(marker);
+
+	std_msgs::ColorRGBA color = marker_colors_.back();
+
+	// computing transform
+	tf::Vector3 center = zone.getCenter();
+	tf::Quaternion q = tf::Quaternion(tf::Vector3(0.0f,0.0f,1.0f),0.0f);
+	tf::Transform zoneTf = tf::Transform(q,center);
+	tf::poseTFToMsg(zoneTf,marker.pose);
+
+	// filling additional fields
+	marker.color = color;
+	marker.ns = "pick_zone";
+	marker.header.stamp = ros::Time(0);
+	marker.header.frame_id = zone.FrameId;
 }
 
-void PickPlaceZoneSelector::getPlaceZoneMarker(visualization_msgs::Marker &marker)
+void PickPlaceZoneSelector::getActivePlaceZonesMarkers(visualization_msgs::MarkerArray &markers)
 {
-//	ZoneBounds &zone = Zones[place_zone_index_];
-//	zone.getMarker(marker);
-//
-//	std_msgs::ColorRGBA color;
-//	color.r = 72.0f/255.0f;
-//	color.g = 209.0f/255.0f;
-//	color.b = 204.0f/255.0f;
-//	color.a = 0.4f;
-//
-//	marker.color = color;
-//	marker.header.frame_id = place_zone_.FrameId;
-//	marker.pose = place_zone_.getZoneCenterPose();
+
+	for(unsigned int i = 0; i < active_place_zones_.size(); i++)
+	{
+		PlaceZone &placeZone = *active_place_zones_[i];
+		visualization_msgs::Marker marker;
+		placeZone.getMarker(marker);
+		marker.color = marker_colors_[((i > (marker_colors_.size()-1))? (i % marker_colors_.size()):(i))];
+		marker.header.stamp = ros::Time(0);
+		marker.header.frame_id = placeZone.FrameId;
+		marker.pose = placeZone.getZoneCenterPose();
+		marker.id= i;
+		marker.ns = "place_zones";
+
+		markers.markers.push_back(marker);
+	}
+}
+
+void PickPlaceZoneSelector::getAllActiveZonesMarkers(visualization_msgs::MarkerArray &markers)
+{
+	std::string markerNs = "active_zones";
+	for(unsigned int i = 0; i < active_place_zones_.size(); i++)
+	{
+		PlaceZone &placeZone = *active_place_zones_[i];
+		visualization_msgs::Marker marker;
+		placeZone.getMarker(marker);
+		marker.color = marker_colors_[((i%2 == 0) ? (i%marker_colors_.size()): marker_colors_.size() - (i%marker_colors_.size()) )];
+		//marker.color = marker_colors_[i];
+		marker.header.frame_id = placeZone.FrameId;
+		marker.header.stamp = ros::Time(0);
+		marker.pose = placeZone.getZoneCenterPose();
+		marker.id= i;
+		marker.ns = markerNs;
+
+		markers.markers.push_back(marker);
+	}
+
+	visualization_msgs::Marker pickZoneMarker;
+	getPickZoneMarker(pickZoneMarker);
+	pickZoneMarker.ns = markerNs;
+	pickZoneMarker.id = active_place_zones_.size();
+	markers.markers.push_back(pickZoneMarker);
 }
 
 void PickPlaceZoneSelector::PlaceZone::resetZone()
@@ -199,22 +276,29 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextLocationCandidates(std::vecto
 		success = generateNextPlacePoseInRandomizedMode(placePoses,otherZones);
 		break;
 
-	case PickPlaceZoneSelector::PlaceZone::DESIGNATED_ZIGZAG_ALONG_X:
+	case PickPlaceZoneSelector::PlaceZone::ZIGZAG_ALONG_X:
 
-		success = generateNextPlacePoseInDesignatedZigZagXMode(placePoses,otherZones);
+		success = generateNextPlacePoseInZigZagXMode(placePoses,otherZones);
 		break;
 
-	case PickPlaceZoneSelector::PlaceZone::DESIGNATED_ZIGZAG_ALONG_Y:
-		success = generateNextPlacePoseInDesignatedZigZagYMode(placePoses,otherZones);
+	case PickPlaceZoneSelector::PlaceZone::ZIGZAG_ALONG_Y:
+		success = generateNextPlacePoseInZigZagYMode(placePoses,otherZones);
 		break;
 
-	case PickPlaceZoneSelector::PlaceZone::DESIGNATED_GRID_ALONG_X:
+	case PickPlaceZoneSelector::PlaceZone::CIRCLE:
+		success = generateNextPlacePoseInCircle(placePoses,otherZones);
+		break;
+
+	case PickPlaceZoneSelector::PlaceZone::GRID_ALONG_X:
 		success = generateNextPlacePoseInGridXWise(placePoses,otherZones);
 		break;
 
-	default:
-		success = generateNextPlacePoseInDesignatedZigZagXMode(placePoses,otherZones);
+	case PickPlaceZoneSelector::PlaceZone::GRID_ALONG_Y:
+		success = generateNextPlacePoseInGridYWise(placePoses,otherZones);
 		break;
+
+	default:
+		success = generateNextPlacePoseInGridXWise(placePoses,otherZones);
 	}
 
 	return success;
@@ -253,6 +337,12 @@ bool PickPlaceZoneSelector::PlaceZone::checkOverlaps(ZoneBounds &nextObjBounds,s
 	typedef std::vector<PlaceZone* >::iterator Iter;
 	for(Iter i = zones.begin();i != zones.end(); i++)
 	{
+		PlaceZone zone = **i;
+		if(!ZoneBounds::intersect(zone,nextObjBounds) && !ZoneBounds::contains(zone,nextObjBounds))
+		{
+			continue;
+		}
+
 		std::vector<ObjectDetails> &objInZone = (*i)->objects_in_zone_;
 		for(std::size_t j = 0; j < objInZone.size(); j++)
 		{
@@ -290,9 +380,11 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInRandomizedMode(std
 		// the z component equals the height of the object plus the requested release distance
 
 		tf::Vector3 pos = tf::Vector3(placeZoneCenter.x(),
-				placeZoneCenter.y(),next_object_details_.Size.z() + ReleaseDistanceFromTable);
+				placeZoneCenter.y(),this->next_object_details_.Size.z() + ReleaseDistanceFromTable);
 		nextTf = tf::Transform(rot,pos);
 		foundNewPlaceLocation = true;
+		std::cout<< typeid(*this).name() <<": First object with id: "<< this->next_object_details_.Id
+				<<", using center of place zone at x: "<<pos.x()<<", y: "<<pos.y()<<", z: "<<pos.z()<<"\n";
 	}
 	else
 	{
@@ -397,7 +489,7 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInRandomizedMode(std
 	return foundNewPlaceLocation;
 }
 
-bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInDesignatedZigZagXMode(std::vector<geometry_msgs::PoseStamped> &placePoses,
+bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInZigZagXMode(std::vector<geometry_msgs::PoseStamped> &placePoses,
 		std::vector<PlaceZone* > &otherZones)
 {
 	// next object details
@@ -491,7 +583,7 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInDesignatedZigZagXM
 
 }
 
-bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInDesignatedZigZagYMode(std::vector<geometry_msgs::PoseStamped> &placePoses,
+bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInZigZagYMode(std::vector<geometry_msgs::PoseStamped> &placePoses,
 		std::vector<PlaceZone* > &otherZones)
 {
 
@@ -597,18 +689,21 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInGridXWise(std::vec
 	tf::Transform nextTf = tf::Transform::getIdentity();
 
 	// search parameters
-	const int maxIterations = 200;
+	const int maxIterations = 50;
 	int counter = 0;
 	double xCoor;
 	double yCoor;
 	bool overlapFound = false;
 	while(counter < maxIterations)
 	{
+		overlapFound = false;
 		/* will use evenness of next object index to compute a new location relative to the top left corner of the place zone.
 		 * Odds go to the top and evens at the bottom (top view of table)
 		 */
-		xCoor = (this->XMin + MinObjectSpacing/2.0f) + ((nextIndex - 1)%grid_x_size_)*MinObjectSpacing;
-		yCoor = (this->YMax - MinObjectSpacing/2.0f) - ((int)std::ceil((double)nextIndex/((double)grid_x_size_)) - 1)*MinObjectSpacing;
+//		xCoor = (this->XMin + MinObjectSpacing/2.0f) + ((nextIndex - 1)%grid_x_size_)*MinObjectSpacing;
+//		yCoor = (this->YMax - MinObjectSpacing/2.0f) - ((int)std::ceil((double)nextIndex/((double)grid_x_size_)) - 1)*MinObjectSpacing;
+		xCoor = (this->XMin + MinObjectSpacing/2.0f) + ((nextIndex)%grid_x_size_)*MinObjectSpacing;
+		yCoor = (this->YMax - MinObjectSpacing/2.0f) - ((int)std::floor((double)nextIndex/((double)grid_x_size_)))*MinObjectSpacing;
 		// incrementing counter
 		counter++;
 
@@ -622,7 +717,7 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInGridXWise(std::vec
 		if(!ZoneBounds::contains(*this,nextObjectBounds))
 		{
 			overlapFound = true;
-			ROS_ERROR_STREAM(ros::this_node::getName()<<": No more space in this place zone "<<maxIterations<<" iterations, exiting");
+			ROS_ERROR_STREAM(ZoneName<<": No more space in zone, exiting");
 			return false;// exit no more space
 		}
 
@@ -658,12 +753,12 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInGridXWise(std::vec
 	}
 	if(overlapFound)
 	{
-		ROS_ERROR_STREAM(ros::this_node::getName()<<": Did not find location after "<<maxIterations<<" iterations, exiting");
+		ROS_ERROR_STREAM(ZoneName<<": Did not find location after "<<maxIterations<<" iterations, exiting");
 	}
 	else
 	{
 		// passed all intersection test
-		ROS_INFO_STREAM(ros::this_node::getName()<<": Found available position for Id: "<<next_object_details_.Id);
+		ROS_INFO_STREAM(ZoneName<<": Found available position for Id: "<<next_object_details_.Id);
 
 		// adjusting place point to object height
 		nextTf.getOrigin().setZ(next_object_details_.Size.z() + ReleaseDistanceFromTable);
@@ -690,18 +785,21 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInGridYWise(std::vec
 	tf::Transform nextTf = tf::Transform::getIdentity();
 
 	// search parameters
-	const int maxIterations = 200;
+	const int maxIterations = 50;
 	int counter = 0;
 	double xCoor;
 	double yCoor;
 	bool overlapFound = false;
 	while(counter < maxIterations)
 	{
+		overlapFound = false;
 		/* will use evenness of next object index to compute a new location relative to the top left corner of the place zone.
 		 * Odds go to the top and evens at the bottom (top view of table)
 		 */
-		yCoor = (this->YMax - MinObjectSpacing/2.0f) - ((nextIndex - 1)%grid_y_size_)*MinObjectSpacing;
-		xCoor = (this->XMin + MinObjectSpacing/2.0f) + ((int)std::ceil((double)nextIndex/((double)grid_y_size_)) - 1)*MinObjectSpacing;
+//		yCoor = (this->YMax - MinObjectSpacing/2.0f) - ((nextIndex - 1)%grid_y_size_)*MinObjectSpacing;
+//		xCoor = (this->XMin + MinObjectSpacing/2.0f) + ((int)std::ceil((double)nextIndex/((double)grid_y_size_)) - 1)*MinObjectSpacing;
+		yCoor = (this->YMax - MinObjectSpacing/2.0f) - ((nextIndex)%grid_y_size_)*MinObjectSpacing;
+		xCoor = (this->XMin + MinObjectSpacing/2.0f) + ((int)std::floor((double)nextIndex/((double)grid_y_size_)))*MinObjectSpacing;
 
 		// incrementing counter
 		counter++;
@@ -716,7 +814,7 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInGridYWise(std::vec
 		if(!ZoneBounds::contains(*this,nextObjectBounds))
 		{
 			overlapFound = true;
-			ROS_ERROR_STREAM(ros::this_node::getName()<<": No more space in this place zone "<<maxIterations<<" iterations, exiting");
+			ROS_ERROR_STREAM(ZoneName<<": No more space in zone, exiting");
 			return false;// exit no more space
 		}
 
@@ -752,12 +850,12 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInGridYWise(std::vec
 	}
 	if(overlapFound)
 	{
-		ROS_ERROR_STREAM(ros::this_node::getName()<<": Did not find location after "<<maxIterations<<" iterations, exiting");
+		ROS_ERROR_STREAM(ZoneName<<": Did not find location after "<<maxIterations<<" iterations, exiting");
 	}
 	else
 	{
 		// passed all intersection test
-		ROS_INFO_STREAM(ros::this_node::getName()<<": Found available position for Id: "<<next_object_details_.Id);
+		ROS_INFO_STREAM(ZoneName<<": Found available position for Id: "<<next_object_details_.Id);
 
 		// adjusting place point to object height
 		nextTf.getOrigin().setZ(next_object_details_.Size.z() + ReleaseDistanceFromTable);
@@ -773,3 +871,104 @@ bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInGridYWise(std::vec
 	return !overlapFound;
 }
 
+bool PickPlaceZoneSelector::PlaceZone::generateNextPlacePoseInCircle(std::vector<geometry_msgs::PoseStamped> &placePoses,
+		std::vector<PlaceZone* > &otherZones)
+{
+	// next object details
+	ZoneBounds nextObjectBounds;;
+	int nextIndex = (int)objects_in_zone_.size();
+
+	// will use next object id (even or odd) to determine its location
+	tf::Transform nextTf = tf::Transform::getIdentity();
+
+	// search parameters
+	const int maxIterations = 50;
+	int segments = 6; // # segments in first layer
+	double deltaTheta = M_PI/3.0f;
+	int counter = 0;
+	double xCoor;
+	double yCoor;
+	double radius;
+	double theta;
+	bool overlapFound = false;
+	tf::Vector3 center = getCenter();
+	while(counter < maxIterations)
+	{
+		overlapFound = false;
+		double factor = std::ceil((double)nextIndex/(double)segments);
+		radius = factor * MinObjectSpacing/2.0f;
+		theta = (nextIndex%segments)*(radius == 0.0f ? 0.0f : deltaTheta/factor);
+		xCoor = center.x() + 2.0f * radius * std::cos(theta);
+		yCoor = center.y() + 2.0f * radius * std::sin(theta);
+
+		// incrementing counter
+		counter++;
+
+		// computing next candidate transform
+		nextTf.setOrigin(tf::Vector3(xCoor,yCoor,0.0f));
+
+		// updating next object bounds
+		nextObjectBounds = ZoneBounds(next_object_details_.Size,nextTf.getOrigin());
+
+		// checking if it is within place zone
+		if(!ZoneBounds::contains(*this,nextObjectBounds))
+		{
+			overlapFound = true;
+			nextIndex++;
+			continue;
+//			ROS_ERROR_STREAM(ZoneName<<": No more space in zone, "<<ZoneName<< " exiting");
+//			return false;// exit no more space
+		}
+
+		// checking if overlaps with objects in place zone
+		typedef std::vector<ObjectDetails>::iterator ConstIter;
+		for(ConstIter iter = objects_in_zone_.begin(); iter != objects_in_zone_.end(); iter++)
+		{
+			ZoneBounds objInZoneBounds(iter->Size,iter->Trans.getOrigin());
+			if(ZoneBounds::boundingCirclesIntersect(nextObjectBounds,objInZoneBounds))
+			{
+				overlapFound = true;
+				break;
+			}
+		}
+		if(overlapFound)
+		{
+			nextIndex++;
+			continue;
+		}
+
+		// checking for overlaps against object in other zones
+		overlapFound = checkOverlaps(nextObjectBounds,otherZones);
+		if(overlapFound)
+		{
+			nextIndex++;
+			continue;
+		}
+		else
+		{
+			break;
+		}
+
+	}
+	if(overlapFound)
+	{
+		ROS_ERROR_STREAM(ZoneName<<": Did not find location after "<<maxIterations<<" iterations, exiting");
+	}
+	else
+	{
+		// passed all intersection test
+		ROS_INFO_STREAM(ZoneName<<": Found available position for Id: "<<next_object_details_.Id);
+
+		// adjusting place point to object height
+		nextTf.getOrigin().setZ(next_object_details_.Size.z() + ReleaseDistanceFromTable);
+
+		// generating candidate poses from next location found
+		createPlaceCandidatePosesByRotation(nextTf,NumGoalCandidates,Axis,placePoses);
+
+		// storing object
+		next_object_details_.Trans = nextTf;
+		objects_in_zone_.push_back(next_object_details_);
+	}
+
+	return !overlapFound;
+}

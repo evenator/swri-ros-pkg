@@ -2,6 +2,7 @@
 * Software License Agreement (BSD License) 
 *
 * Copyright (c) 2011, Southwest Research Institute
+* Copyright (c) 2012, Edward Venator, Case Western Reserve University
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -13,6 +14,9 @@
 * 	notice, this list of conditions and the following disclaimer in the
 * 	documentation and/or other materials provided with the distribution.
 * 	* Neither the name of the Southwest Research Institute, nor the names 
+*	of its contributors may be used to endorse or promote products derived
+*	from this software without specific prior written permission.
+* 	* Neither the name of Case Western Reserve University, nor the names 
 *	of its contributors may be used to endorse or promote products derived
 *	from this software without specific prior written permission.
 *
@@ -29,10 +33,12 @@
 * POSSIBILITY OF SUCH DAMAGE.
 */ 
 
+#include "ros/ros.h"
 #include <joint_relay_handler.h>
 #include "simple_message/messages/joint_message.h"
 #include "simple_message/log_wrapper.h"
-
+#include "urdf/model.h"
+#include "urdf_interface/joint.h"
 
 using namespace industrial::joint_message;
 using namespace industrial::simple_message;
@@ -52,27 +58,51 @@ JointRelayHandler::JointRelayHandler(ros::NodeHandle &n) :
           this->node_.advertise<control_msgs::FollowJointTrajectoryFeedback>("feedback_states", 1);
 
   this->pub_joint_sensor_state_ = this->node_.advertise<sensor_msgs::JointState>("joint_states",1);
-
-  // Set up the default joint names (TODO: This should be made more generic.  The
-  // joint names can have an arbitrary prefix that isn't accounted for here.  This
-  // info can be found in the URDF, but I don't know how to get it here.
-  this->joint_control_state_.joint_names.push_back("joint_s");
-  this->joint_control_state_.joint_names.push_back("joint_l");
-  this->joint_control_state_.joint_names.push_back("joint_e");
-  this->joint_control_state_.joint_names.push_back("joint_u");
-  this->joint_control_state_.joint_names.push_back("joint_r");
-  this->joint_control_state_.joint_names.push_back("joint_b");
-  this->joint_control_state_.joint_names.push_back("joint_t");
-  // TODO: Again, this should be more generic.
-  this->joint_control_state_.actual.positions.resize(NUM_OF_JOINTS_);
-  this->joint_control_state_.desired.positions.resize(NUM_OF_JOINTS_);
-  this->joint_control_state_.error.positions.resize(NUM_OF_JOINTS_);
+  
+  std::string urdf;
+  int num_joints = NUM_OF_JOINTS_;
+  if(! this->node_.searchParam("robot_description", urdf)){
+    //Set up joint names from URDF file
+    urdf::Model model;
+    if (!model.initFile(urdf)){
+        ROS_ERROR("Failed to parse urdf file. Using default joint configuration.");
+        // Set up the default joint names
+        this->joint_control_state_.joint_names.push_back("joint_s");
+        this->joint_control_state_.joint_names.push_back("joint_l");
+        this->joint_control_state_.joint_names.push_back("joint_e");
+        this->joint_control_state_.joint_names.push_back("joint_u");
+        this->joint_control_state_.joint_names.push_back("joint_r");
+        this->joint_control_state_.joint_names.push_back("joint_b");
+        this->joint_control_state_.joint_names.push_back("joint_t");
+    }
+    else{
+        ROS_INFO("Successfully parsed urdf file");
+        for (std::map<std::string, boost::shared_ptr<urdf::Joint> >::const_iterator joint = model.joints_.begin(); joint != model.joints_.end(); joint++){
+          this->joint_control_state_.joint_names.push_back((*joint).second->name);
+        }
+        num_joints = model.joints_.size();
+    }
+  }
+  else{
+      ROS_WARN("No urdf file in robot_description. Using default joint configuration.");
+      // Set up the default joint names
+      this->joint_control_state_.joint_names.push_back("joint_s");
+      this->joint_control_state_.joint_names.push_back("joint_l");
+      this->joint_control_state_.joint_names.push_back("joint_e");
+      this->joint_control_state_.joint_names.push_back("joint_u");
+      this->joint_control_state_.joint_names.push_back("joint_r");
+      this->joint_control_state_.joint_names.push_back("joint_b");
+      this->joint_control_state_.joint_names.push_back("joint_t");
+  }
+  this->joint_control_state_.actual.positions.resize(num_joints);
+  this->joint_control_state_.desired.positions.resize(num_joints);
+  this->joint_control_state_.error.positions.resize(num_joints);
 
   // Copy from control state to sensor state
   this->joint_sensor_state_.name = this->joint_control_state_.joint_names;
-  this->joint_sensor_state_.position.resize(NUM_OF_JOINTS_);
-  this->joint_sensor_state_.velocity.resize(NUM_OF_JOINTS_);
-  this->joint_sensor_state_.effort.resize(NUM_OF_JOINTS_);
+  this->joint_sensor_state_.position.resize(num_joints);
+  this->joint_sensor_state_.velocity.resize(num_joints);
+  this->joint_sensor_state_.effort.resize(num_joints);
 }
 
 bool JointRelayHandler::init(industrial::smpl_msg_connection::SmplMsgConnection* connection)

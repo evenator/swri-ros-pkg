@@ -17,7 +17,7 @@
   <depend package="simple_message"/>
   <depend package="actionlib_msgs" />
   <depend package="actionlib"/>
-  
+  <depend package="urdf"/>  
   <export>
     <cpp cflags="-I${prefix}/include/"/>
   </export>

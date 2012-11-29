@@ -67,12 +67,12 @@ JointRelayHandler::JointRelayHandler(ros::NodeHandle &n) :
     if (!model.initFile(urdf)){
         ROS_ERROR("Failed to parse urdf file. Using default joint configuration.");
         // Set up the default joint names
-        this->joint_control_state_.joint_names.push_back("joint_s");
-        this->joint_control_state_.joint_names.push_back("joint_l");
-        this->joint_control_state_.joint_names.push_back("joint_e");
-        this->joint_control_state_.joint_names.push_back("joint_u");
-        this->joint_control_state_.joint_names.push_back("joint_r");
-        this->joint_control_state_.joint_names.push_back("joint_b");
+        this->joint_control_state_.joint_names.push_back("joint1");
+        this->joint_control_state_.joint_names.push_back("joint2");
+        this->joint_control_state_.joint_names.push_back("joint3");
+        this->joint_control_state_.joint_names.push_back("joint4");
+        this->joint_control_state_.joint_names.push_back("joint5");
+        this->joint_control_state_.joint_names.push_back("joint6");
         this->joint_control_state_.joint_names.push_back("joint_t");
     }
     else{
@@ -86,12 +86,12 @@ JointRelayHandler::JointRelayHandler(ros::NodeHandle &n) :
   else{
       ROS_WARN("No urdf file in robot_description. Using default joint configuration.");
       // Set up the default joint names
-      this->joint_control_state_.joint_names.push_back("joint_s");
-      this->joint_control_state_.joint_names.push_back("joint_l");
-      this->joint_control_state_.joint_names.push_back("joint_e");
-      this->joint_control_state_.joint_names.push_back("joint_u");
-      this->joint_control_state_.joint_names.push_back("joint_r");
-      this->joint_control_state_.joint_names.push_back("joint_b");
+        this->joint_control_state_.joint_names.push_back("joint1");
+        this->joint_control_state_.joint_names.push_back("joint2");
+        this->joint_control_state_.joint_names.push_back("joint3");
+        this->joint_control_state_.joint_names.push_back("joint4");
+        this->joint_control_state_.joint_names.push_back("joint5");
+        this->joint_control_state_.joint_names.push_back("joint6");
       this->joint_control_state_.joint_names.push_back("joint_t");
   }
   this->joint_control_state_.actual.positions.resize(num_joints);

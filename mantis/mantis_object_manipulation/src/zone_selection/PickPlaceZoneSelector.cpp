@@ -63,6 +63,9 @@ void PickPlaceZoneSelector::initializeColorArray()
 	color.r = 1.0f; color.g = 1.0f; color.b = 0.0f;
 	marker_colors_.push_back(color);
 
+	//red
+	color.r = 1.0f; color.g = 0.0f; color.b = 0.0f; color.a = 0.2f;
+
 }
 
 void PickPlaceZoneSelector::goToNextPickZone()
@@ -123,13 +126,21 @@ bool PickPlaceZoneSelector::isInPickZone(const sensor_msgs::PointCloud &cluster)
 
 	// checking frame ids and transforming cloud if they are different
 	tf::TransformListener tfListener;
-	tf::StampedTransform clusterTransform;
+	tf::StampedTransform clusterTransform;// = tf::StampedTransform( tf::Transform::getIdentity());
 	Eigen::Affine3d tfEigen;
 	if(pickZone.FrameId.compare(cluster.header.frame_id) != 0)
 	{
-		tfListener.lookupTransform(pickZone.FrameId,cluster.header.frame_id,ros::Time::now(),clusterTransform);
-		tf::TransformTFToEigen(clusterTransform,tfEigen);
-		pcl::transformPointCloud(cloud,cloud,Eigen::Affine3f(tfEigen));
+		try
+		{
+			tfListener.lookupTransform(pickZone.FrameId,cluster.header.frame_id,ros::Time::now(),clusterTransform);
+			tf::TransformTFToEigen(clusterTransform,tfEigen);
+			pcl::transformPointCloud(cloud,cloud,Eigen::Affine3f(tfEigen));
+		}
+		catch(tf::LookupException &e)
+		{
+			ROS_WARN_STREAM(ros::this_node::getName()<<": lookup exception thrown, not transforming to frame");
+		}
+
 	}
 
 	// finding centroid
@@ -162,6 +173,8 @@ bool  PickPlaceZoneSelector::generateNextLocationCandidates(std::vector<geometry
 		PlaceZone& placeZone = *active_place_zones_[i];
 		if(placeZone.isIdInZone(next_obj_details_.Id))
 		{
+			ROS_WARN_STREAM("ZoneSelector: located id in zone "<<placeZone.ZoneName);
+
 			// creating array with available place zones not including the current one
 			nearbyZones.assign(active_place_zones_.begin(),active_place_zones_.end());
 			nearbyZones.erase(nearbyZones.begin() + i);
@@ -175,6 +188,8 @@ bool  PickPlaceZoneSelector::generateNextLocationCandidates(std::vector<geometry
 				break;
 			}
 		}
+
+		ROS_WARN_STREAM("ZoneSelector: Did not located id in zone "<<placeZone.ZoneName);
 	}
 	return locationFound;
 }

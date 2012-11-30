@@ -36,7 +36,7 @@ LOCAL VAR intnum intr_new_trajectory;
 PROC main()
     VAR num current_index;
     VAR jointtarget target;
-    VAR speeddata move_speed := v10;  ! default speed
+    VAR speeddata move_speed := v100;  ! default speed
     VAR zonedata stop_mode;
     
     ! Set up interrupt to watch for new trajectory

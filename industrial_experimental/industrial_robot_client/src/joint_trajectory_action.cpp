@@ -58,12 +58,12 @@ public:
     // Set up the default joint names (TODO: This should be made more generic.  The
     // joint names can have an arbitrary prefix that isn't accounted for here.  This
     // info can be found in the URDF, but I don't know how to get it here.
-    joint_names_.push_back("joint_s");
-    joint_names_.push_back("joint_l");
-    joint_names_.push_back("joint_e");
-    joint_names_.push_back("joint_u");
-    joint_names_.push_back("joint_r");
-    joint_names_.push_back("joint_b");
+    joint_names_.push_back("joint1");
+    joint_names_.push_back("joint2");
+    joint_names_.push_back("joint3");
+    joint_names_.push_back("joint4");
+    joint_names_.push_back("joint5");
+    joint_names_.push_back("joint6");
     joint_names_.push_back("joint_t");
 
     pn.param("constraints/goal_time", goal_time_constraint_, 0.0);

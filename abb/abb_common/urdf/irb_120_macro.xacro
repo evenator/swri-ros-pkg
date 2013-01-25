@@ -7,9 +7,11 @@
 				<mesh filename="package://abb_common/meshes/irb_120/visual/base_link.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
 			<origin rpy="0 0 0" xyz="0.04203954 -0.07963916 8.0162399451e-05"/>
-			<material name="IRB120_Base_rev0:11_color">
-				<color rgba="0.752941 0.752941 0.752941 1"/>
-			</material>
+      			<material
+        			name="abb_orange">
+        			<color
+          			rgba="1 0.43 0 1" />
+      			</material>
 		</visual>
 		<inertial>
 			<mass value="6.21503193527"/>
@@ -29,9 +31,11 @@
 				<mesh filename="package://abb_common/meshes/irb_120/visual/link_1.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
 			<origin rpy="0 0 0" xyz="0 -0.17649952 0"/>
-			<material name="IRB120_Link1_rev0:11_color">
-				<color rgba="0.752941 0.752941 0.752941 1"/>
-			</material>
+      			<material
+        			name="abb_orange">
+        			<color
+          			rgba="1 0.43 0 1" />
+      			</material>
 		</visual>
 		<inertial>
 			<mass value="3.06736850696"/>
@@ -51,9 +55,11 @@
 				<mesh filename="package://abb_common/meshes/irb_120/visual/link_2.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
             <origin rpy="0 0 0" xyz="1.54358428872e-06 0.269999754796 0.115499748015"/>
-			<material name="IRB120_Link2_rev0:11_color">
-				<color rgba="0.752941 0.752941 0.752941 1"/>
-			</material>
+      			<material
+        			name="abb_orange">
+        			<color
+          			rgba="1 0.43 0 1" />
+      			</material>
 		</visual>
 		<inertial>
 			<mass value="3.90875060185"/>
@@ -73,9 +79,11 @@
 				<mesh filename="package://abb_common/meshes/irb_120/visual/link_3.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
             <origin rpy="0 0 0" xyz="0.071952848745 -0.0661526901756 0.0589997805382"/>
-			<material name="IRB120_Link3_rev0:11_color">
-				<color rgba="0.752941 0.752941 0.752941 1"/>
-			</material>
+      			<material
+        			name="abb_orange">
+        			<color
+          			rgba="1 0.43 0 1" />
+      			</material>
 		</visual>
 		<inertial>
 			<mass value="2.94383262499"/>
@@ -95,9 +103,11 @@
 				<mesh filename="package://abb_common/meshes/irb_120/visual/link_4.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
 			<origin rpy="0 0 0" xyz="500.302187012 0.00151561224702 -0.000313229561613"/>
-			<material name="IRB120_Link4_rev0:11_color">
-				<color rgba="0.752941 0.752941 0.752941 1"/>
-			</material>
+      			<material
+        			name="abb_orange">
+        			<color
+          			rgba="1 0.43 0 1" />
+      			</material>
 		</visual>
 		<inertial>
 			<mass value="1.32790527095"/>
@@ -117,9 +127,11 @@
 				<mesh filename="package://abb_common/meshes/irb_120/visual/link_5.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
 			<origin rpy="0 0 0" xyz="-0.301998488439 -0.629998750685 -0.0619993114233"/>
-			<material name="IRB120_Link5_rev0:11_color">
-				<color rgba="0.752941 0.752941 0.752941 1"/>
-			</material>
+      			<material
+        			name="abb_orange">
+        			<color
+          			rgba="1 0.43 0 1" />
+      			</material>
 		</visual>
 		<inertial>
 			<mass value="0.546633236934"/>
@@ -139,9 +151,11 @@
 				<mesh filename="package://abb_common/meshes/irb_120/visual/link_6.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
 			<origin rpy="0 0 0" xyz="-2.74896335695e-07 -8.57788299224e-07 -0.0130000906507"/>
-			<material name="IRB120_Link6_rev0:11_color">
-				<color rgba="0.752941 0.752941 0.752941 1"/>
-			</material>
+      			<material
+        			name="abb_orange">
+        			<color
+          			rgba="1 0.43 0 1" />
+      			</material>
 		</visual>
 		<inertial>
 			<mass value="0.0136784407912"/>

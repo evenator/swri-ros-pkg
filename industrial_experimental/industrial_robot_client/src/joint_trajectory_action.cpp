@@ -64,7 +64,6 @@ public:
     joint_names_.push_back("joint4");
     joint_names_.push_back("joint5");
     joint_names_.push_back("joint6");
-    joint_names_.push_back("joint_t");
 
     pn.param("constraints/goal_time", goal_time_constraint_, 0.0);
 

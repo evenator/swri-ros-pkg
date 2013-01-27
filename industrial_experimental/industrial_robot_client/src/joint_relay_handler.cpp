@@ -73,7 +73,6 @@ JointRelayHandler::JointRelayHandler(ros::NodeHandle &n) :
         this->joint_control_state_.joint_names.push_back("joint4");
         this->joint_control_state_.joint_names.push_back("joint5");
         this->joint_control_state_.joint_names.push_back("joint6");
-        this->joint_control_state_.joint_names.push_back("joint_t");
     }
     else{
         ROS_INFO("Successfully parsed urdf file");
@@ -92,7 +91,6 @@ JointRelayHandler::JointRelayHandler(ros::NodeHandle &n) :
         this->joint_control_state_.joint_names.push_back("joint4");
         this->joint_control_state_.joint_names.push_back("joint5");
         this->joint_control_state_.joint_names.push_back("joint6");
-      this->joint_control_state_.joint_names.push_back("joint_t");
   }
   this->joint_control_state_.actual.positions.resize(num_joints);
   this->joint_control_state_.desired.positions.resize(num_joints);

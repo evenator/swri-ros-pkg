@@ -90,20 +90,24 @@ void JointTrajectoryDownloader::jointTrajectoryCB(
 	//}
 
 	// Trajectory download requires at least two points (START/END)
-        if (points.size() < 2)
+    if(points.size() < 1){
+        ROS_WARN("Trajectory has no points.");
+        return;
+    }
+    else if (points.size() < 2)
           points.push_back(trajectory_msgs::JointTrajectoryPoint(points[0]));
 
-  if (!this->robot_->isConnected())
-  {
-    ROS_WARN("Attempting robot reconnection");
-    this->robot_->makeConnect();
-  }
+    if (!this->robot_->isConnected())
+    {
+        ROS_WARN("Robot is disconnected. Attempting robot reconnection");
+        this->robot_->makeConnect();
+    }
   
-  ROS_INFO("Sending trajectory points, size: %d", points.size());
+    ROS_INFO("Sending trajectory points, size: %d", points.size());
 
 	for (int i = 0; i < points.size(); i++)
 	{
-		ROS_INFO("Sending joints trajectory point[%d]", i);
+		ROS_DEBUG("Sending joints trajectory point[%d]", i);
 
 		JointTrajPt jPt;
 		JointTrajPtMessage jMsg;
@@ -159,13 +163,14 @@ void JointTrajectoryDownloader::jointTrajectoryCB(
 		ROS_DEBUG("Sending joint trajectory point");
 		if (this->robot_->sendMsg(topic))
 		{
-			ROS_INFO("Point[%d] sent to controller", i);
+			ROS_DEBUG("Point[%d] sent to controller", i);
 		}
 		else
 		{
 			ROS_WARN("Failed sent joint point, skipping point");
 		}
 	}
+    ROS_DEBUG("Finished sending trajectory.");
 }
 
 void JointTrajectoryDownloader::trajectoryStop()

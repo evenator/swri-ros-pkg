@@ -100,7 +100,7 @@ private:
   JointTrajectoryState state_;
   ros::Time streaming_start_;
 
-  static const int NUM_OF_JOINTS_ = 7;
+  static const int NUM_OF_JOINTS_ = 6;
 };
 
 } //joint_trajectory_handler

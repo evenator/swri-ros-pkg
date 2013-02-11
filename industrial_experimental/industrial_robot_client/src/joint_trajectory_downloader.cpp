@@ -118,8 +118,10 @@ void JointTrajectoryDownloader::jointTrajectoryCB(
     // work.
     std::vector<double> joint_velocities(0.0);
     double velocity =0 ;
+    if( msg->joint_names.size() != points[i].velocities.size())
+        ROS_WARN("Point %d has %d velocities defined, but this message has %d joints named",i, points[i].velocities.size(), msg->joint_names.size());
     joint_velocities.resize(msg->joint_names.size(), 0.0);
-    for (int j = 0; j < joint_velocities.size(); j++)
+    for (int j = 0; j < std::min(joint_velocities.size(), points[i].velocities.size()); j++)
     {
       joint_velocities[j] = points[i].velocities[j];
     }
@@ -149,6 +151,9 @@ void JointTrajectoryDownloader::jointTrajectoryCB(
 		}
 
 		// Copy position data to local variable
+        if(msg->joint_names.size() != points[i].positions.size())
+            ROS_WARN("Point %d has %d positions defined, but this message has %d joints named",i, points[i].positions.size(), msg->joint_names.size());
+ 
 		JointData data;
 		for (int j = 0; j < msg->joint_names.size(); j++)
 		{

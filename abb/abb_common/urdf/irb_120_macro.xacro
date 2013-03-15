@@ -44,7 +44,7 @@
 			<geometry>
 				<mesh filename="package://abb_common/meshes/irb_120/visual/link_2.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
-            <origin rpy="0 0 0" xyz="0 0.269999754796 0.0574996276953"/>
+            <origin rpy="0 3.14159 0" xyz="0 0.269999754796 -0.0574996276953"/>
       			<material
         			name="abb_orange">
         			<color
@@ -55,7 +55,7 @@
 			<geometry>
 				<mesh filename="package://abb_common/meshes/irb_120/collision/link_2.stl" scale="0.0254 0.0254 0.0254"/>
 			</geometry>
-			<origin rpy="0 0 0" xyz="0 0.269999754796 0.0574996276953"/>
+			<origin rpy="0 3.14159 0" xyz="0 0.269999754796 -0.0574996276953"/>
 		</collision>
 	</link>
 	<link name="${prefix}link_3">

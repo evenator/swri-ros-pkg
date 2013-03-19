@@ -1,4 +1,10 @@
-bin
-build
-lib
+bin/
+build/
+msg_gen/
+srv_gen/
+lib/
+.svn/
+*.swp
+*.pyo
+*.pyc
 *~

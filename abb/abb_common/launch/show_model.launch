@@ -1,0 +1,12 @@
+<?xml version="1.0" ?>
+<launch>
+	<arg name="joint_gui" default="True" />
+	<arg name="file" />
+	<arg name="xacro" default="false"/>
+  <node pkg="rviz" type="rviz" name="viewer" args="-d $(find cwru_utilities)/config/show_model.vcg"/> 
+	<param name="robot_description" command="$(find xacro)/xacro.py '$(find abb_common)/urdf/$(arg file)'"  if="$(arg xacro)"/>
+	<param name="robot_description" textfile="$(find  abb_common)/urdf/$(arg file)" unless="$(arg xacro)"/>
+	<node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
+	<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher"></node>
+	<param name="use_gui" value="$(arg joint_gui)"/>
+</launch>

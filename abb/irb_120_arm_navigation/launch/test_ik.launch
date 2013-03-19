@@ -1,0 +1,9 @@
+<launch>
+  <include file="$(find irb_120_arm_navigation)/launch/fake_jointstate_pub_kinematics_solver.launch" >
+    <arg name="base_link" value="base_link" />
+    <arg name="tip_link" value="link_6" />
+  </include>
+  <include  file="$(find arm_kinematics_tools)/launch/get_ik.launch">
+        <arg name="kinematics_service_name" value="/irb_120_irb_120_kinematics" />
+  </include>
+</launch>

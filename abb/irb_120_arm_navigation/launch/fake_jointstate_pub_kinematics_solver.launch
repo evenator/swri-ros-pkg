@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<launch>
+<arg name="base_link" default="base_link" />
+<arg name="tip_link" default="link_6" />
+    <!-- Load robot model into Parameter Server -->
+    <param name="robot_description" textfile="$(find abb_common)/urdf/irb_120_minimal.urdf" /> <!--command="$(find xacro)/xacro.py '$(find abb_common)/urdf/irb_120.xacro'" /-->
+
+    <!-- Start Robot State Publisher (calculates joint frame transforms) -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
+
+    <!-- Start Joint State Publisher with joint control GUI -->
+    <param name="use_gui" value="true" />
+    <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher"/>
+
+    <!-- Start Rviz visualization tool using saved config file -->
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find irb_120_arm_navigation)/config/planning_components_visualizer.vcg" />
+
+    <include file="$(find planning_environment)/launch/environment_server.launch">
+        <arg name="use_monitor" value="true" />
+        <arg name="use_collision_map" value="false" />
+    </include>
+
+    <!-- Load planning config from abby_arm_navigation package -->
+    <rosparam command="load" ns="robot_description_planning" file="$(find irb_120_arm_navigation)/config/irb_120_planning_description.yaml" />
+
+    <!-- Load arm_kinematics_constraint_aware node configured for your robot, using specific kinematics plugin -->
+    <node pkg="arm_kinematics_constraint_aware" type="arm_kinematics_constraint_aware" name="irb_120_irb_120_kinematics" output="screen" >
+        <param name="group" type="string" value="irb_120"/>
+        <param name="irb_120/root_name" type="string" value="$(arg base_link)"/>
+        <param name="irb_120/tip_name" type="string" value="$(arg tip_link)"/>
+
+        <!-- KDL is the default plugin, however you can build an IKFast plugin -->
+        <!-- param name="kinematics_solver" type="string" value="arm_kinematics_constraint_aware/KDLArmKinematicsPlugin" /-->
+        <param name="kinematics_solver" type="string" value="irb_120_irb_120_kinematics/IKFastKinematicsPlugin" />
+
+   </node>
+
+</launch> 
+
